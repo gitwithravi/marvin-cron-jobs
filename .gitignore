@@ -15,7 +15,7 @@ __pycache__/
 data/*
 !data/.gitkeep
 
-reports/
+/reports/
 
 logs/*
 !logs/.gitkeep
