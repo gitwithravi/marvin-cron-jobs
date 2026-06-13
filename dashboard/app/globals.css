@@ -578,6 +578,148 @@ pre {
   white-space: pre;
 }
 
+.json-viewer {
+  background: #f1f5f3;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  margin: 18px 0;
+  overflow: hidden;
+}
+
+.json-viewer-header {
+  align-items: center;
+  background: var(--panel);
+  color: #edf4f1;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.json-viewer-header .eyebrow {
+  color: #8fbba9;
+}
+
+.json-viewer-header h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.json-tree {
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-height: min(72vh, 820px);
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.json-node {
+  margin: 2px 0;
+}
+
+.json-node summary {
+  align-items: center;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 6px;
+}
+
+.json-node summary:hover,
+.json-row:hover {
+  background: rgba(71, 127, 104, 0.09);
+}
+
+.json-children {
+  border-left: 1px solid var(--border);
+  margin-left: 12px;
+  padding-left: 12px;
+}
+
+.json-row {
+  align-items: baseline;
+  border-radius: 5px;
+  display: flex;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 6px;
+}
+
+.json-key {
+  color: #285b48;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.json-separator {
+  color: var(--muted);
+}
+
+.json-type,
+.json-count {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  text-transform: uppercase;
+}
+
+.json-count {
+  background: #e5ebe8;
+}
+
+.json-primitive {
+  overflow-wrap: anywhere;
+}
+
+.json-string {
+  color: #7b4f16;
+}
+
+.json-number {
+  color: #235f80;
+}
+
+.json-boolean {
+  color: #7b3f92;
+}
+
+.json-null {
+  color: #697775;
+  font-style: italic;
+}
+
+.json-empty {
+  color: var(--muted);
+  margin: 6px 0 6px 8px;
+}
+
+.json-raw {
+  border-top: 1px solid var(--border);
+}
+
+.json-raw summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+
+.json-raw pre {
+  border-radius: 0;
+  margin: 0;
+  max-height: 520px;
+}
+
 .inline-code,
 .markdown-viewer p code,
 .markdown-viewer li code {
