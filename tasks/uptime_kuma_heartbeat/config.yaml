@@ -1,0 +1,9 @@
+task_name: uptime_kuma_heartbeat
+model: "deepseek/deepseek-v4-flash"
+heartbeat_lookback_hours: 24
+database_path: "data/marvin.sqlite3"
+report_dir: "reports/uptime_kuma_heartbeat"
+openrouter:
+  temperature: 0.2
+  max_tokens: 1200
+
