@@ -1,0 +1,15 @@
+task_name: beszel_server_status
+model: "deepseek/deepseek-v4-flash"
+alert_history_lookback_hours: 24
+system_stats_lookback_hours: 1
+database_path: "data/marvin.sqlite3"
+report_dir: "reports/beszel_server_status"
+openrouter:
+  temperature: 0.2
+  max_tokens: 1200
+notifications:
+  enabled: false
+  risk_threshold: medium
+  channels:
+    - telegram
+  include_report_path: true

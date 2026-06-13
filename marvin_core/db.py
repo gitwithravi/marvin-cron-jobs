@@ -54,6 +54,50 @@ CREATE TABLE IF NOT EXISTS reports (
     llm_json TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES task_runs(id)
 );
+
+CREATE TABLE IF NOT EXISTS beszel_system_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    system_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    host TEXT,
+    status TEXT,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, system_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
+
+CREATE TABLE IF NOT EXISTS beszel_alert_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    alert_id TEXT NOT NULL,
+    system_id TEXT,
+    alert_name TEXT,
+    triggered INTEGER,
+    value TEXT,
+    min_value TEXT,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, alert_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
+
+CREATE TABLE IF NOT EXISTS beszel_alert_history_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    history_id TEXT NOT NULL,
+    system_id TEXT,
+    alert_id TEXT,
+    alert_type TEXT,
+    value TEXT,
+    resolved INTEGER,
+    created_at TEXT,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, history_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
 """
 
 
@@ -68,7 +112,11 @@ def connect(database_path: str | Path) -> sqlite3.Connection:
 
 def migrate(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY)"
+    )
     conn.commit()
+    run_migrations(conn)
 
 
 def create_task_run(conn: sqlite3.Connection, task_name: str, started_at: str) -> int:
@@ -91,6 +139,28 @@ def finish_task_run(
         "UPDATE task_runs SET finished_at = ?, status = ?, error = ? WHERE id = ?",
         (finished_at, status, error, run_id),
     )
+    conn.commit()
+
+
+MIGRATIONS = [
+    ("beszel_alert_observations_alert_name", "ALTER TABLE beszel_alert_observations ADD COLUMN alert_name TEXT"),
+    ("beszel_alert_observations_triggered", "ALTER TABLE beszel_alert_observations ADD COLUMN triggered INTEGER"),
+    ("beszel_alert_observations_min_value", "ALTER TABLE beszel_alert_observations ADD COLUMN min_value TEXT"),
+]
+
+
+def run_migrations(conn: sqlite3.Connection) -> None:
+    applied = {
+        row[0]
+        for row in conn.execute("SELECT name FROM _migrations").fetchall()
+    }
+    for name, sql in MIGRATIONS:
+        if name not in applied:
+            try:
+                conn.execute(sql)
+            except sqlite3.OperationalError:
+                pass
+            conn.execute("INSERT INTO _migrations (name) VALUES (?)", (name,))
     conn.commit()
 
 
@@ -174,6 +244,95 @@ def insert_report(
             report_path,
             llm_model,
             json.dumps(llm_json, sort_keys=True),
-        ),
+),
+    )
+    conn.commit()
+
+
+def insert_beszel_system_snapshots(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    systems: Iterable[dict[str, Any]],
+) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO beszel_system_snapshots
+            (run_id, observed_at, system_id, name, host, status, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                system["id"],
+                system.get("name") or f"system-{system['id']}",
+                system.get("host"),
+                system.get("status"),
+                json.dumps(system, sort_keys=True, default=str),
+            )
+            for system in systems
+        ],
+    )
+    conn.commit()
+
+
+def insert_beszel_alert_observations(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    alerts: Iterable[dict[str, Any]],
+) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO beszel_alert_observations
+            (run_id, observed_at, alert_id, system_id, alert_name, triggered, value, min_value, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                alert["id"],
+                alert.get("system"),
+                alert.get("name"),
+                1 if alert.get("triggered") else 0,
+                str(alert["value"]) if alert.get("value") is not None else None,
+                str(alert["min"]) if alert.get("min") is not None else None,
+                json.dumps(alert, sort_keys=True, default=str),
+            )
+            for alert in alerts
+        ],
+    )
+    conn.commit()
+
+
+def insert_beszel_alert_history_observations(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    history_entries: Iterable[dict[str, Any]],
+) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO beszel_alert_history_observations
+            (run_id, observed_at, history_id, system_id, alert_id, alert_type, value, resolved, created_at, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                entry["id"],
+                entry.get("system"),
+                entry.get("alert"),
+                entry.get("type"),
+                entry.get("value"),
+                1 if entry.get("resolved") else 0,
+                entry.get("created"),
+                json.dumps(entry, sort_keys=True, default=str),
+            )
+            for entry in history_entries
+        ],
     )
     conn.commit()
