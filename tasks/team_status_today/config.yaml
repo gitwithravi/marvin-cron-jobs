@@ -1,0 +1,16 @@
+task_name: team_status_today
+model: "deepseek/deepseek-v4-flash"
+database_path: "data/marvin.sqlite3"
+report_dir: "reports/team_status_today"
+request_timeout_seconds: 30
+request_max_retries: 3
+request_backoff_factor: 0.5
+openrouter:
+  temperature: 0.2
+  max_tokens: 1200
+notifications:
+  enabled: false
+  risk_threshold: medium
+  channels:
+    - telegram
+  include_report_path: true

@@ -98,6 +98,33 @@ CREATE TABLE IF NOT EXISTS beszel_alert_history_observations (
     UNIQUE (run_id, history_id),
     FOREIGN KEY (run_id) REFERENCES task_runs(id)
 );
+
+CREATE TABLE IF NOT EXISTS team_status_member_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    member_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, member_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
+
+CREATE TABLE IF NOT EXISTS team_status_task_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    task_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    work_date TEXT NOT NULL,
+    title TEXT,
+    status TEXT,
+    project_name TEXT,
+    notes TEXT,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, task_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
 """
 
 
@@ -333,6 +360,63 @@ def insert_beszel_alert_history_observations(
                 json.dumps(entry, sort_keys=True, default=str),
             )
             for entry in history_entries
+        ],
+    )
+    conn.commit()
+
+
+def insert_team_status_member_snapshots(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    members: Iterable[dict[str, Any]],
+) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO team_status_member_snapshots
+            (run_id, observed_at, member_id, name, raw_json)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                member["id"],
+                member.get("name") or f"member-{member['id']}",
+                json.dumps(member, sort_keys=True, default=str),
+            )
+            for member in members
+        ],
+    )
+    conn.commit()
+
+
+def insert_team_status_task_observations(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    tasks: Iterable[dict[str, Any]],
+) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO team_status_task_observations
+            (run_id, observed_at, task_id, member_id, work_date, title, status, project_name, notes, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                task["id"],
+                task["member_id"],
+                task.get("work_date"),
+                task.get("title"),
+                task.get("status"),
+                task.get("project_name"),
+                task.get("notes"),
+                json.dumps(task, sort_keys=True, default=str),
+            )
+            for task in tasks
         ],
     )
     conn.commit()
