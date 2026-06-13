@@ -60,4 +60,7 @@ def write_markdown_report(
     lines.append(json.dumps(factual_data, indent=2, sort_keys=True, default=str))
     lines.extend(["```", ""])
     path.write_text("\n".join(lines), encoding="utf-8")
+    latest_link = output_dir / "latest.md"
+    latest_link.unlink(missing_ok=True)
+    latest_link.symlink_to(path.name)
     return path
