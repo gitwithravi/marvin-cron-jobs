@@ -1,16 +1,18 @@
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface-muted: #eef1f5;
-  --border: #d8dde5;
-  --text: #17202a;
-  --muted: #667085;
-  --accent: #0f766e;
-  --accent-dark: #115e59;
-  --danger: #b42318;
-  --warning: #b54708;
-  --success: #027a48;
-  --shadow: 0 12px 30px rgba(16, 24, 40, 0.08);
+  --bg: #e9edf0;
+  --surface: #f8faf9;
+  --surface-muted: #e1e7e5;
+  --panel: #11191d;
+  --border: #c5cecb;
+  --border-strong: #99a6a3;
+  --text: #162023;
+  --muted: #5f6d6b;
+  --accent: #477f68;
+  --accent-dark: #285b48;
+  --danger: #a23a32;
+  --warning: #9b6a22;
+  --success: #326b4e;
+  --shadow: 0 12px 28px rgba(17, 25, 29, 0.08);
 }
 
 * {
@@ -29,6 +31,17 @@ body {
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+}
+
+body::before {
+  background:
+    linear-gradient(rgba(22, 32, 35, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 32, 35, 0.025) 1px, transparent 1px);
+  background-size: 24px 24px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
 }
 
 a {
@@ -57,14 +70,25 @@ pre {
 
 .login-panel {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: var(--shadow);
   display: grid;
   gap: 24px;
   max-width: 420px;
   padding: 28px;
+  position: relative;
   width: 100%;
+}
+
+.login-panel::before {
+  background: var(--panel);
+  content: "";
+  height: 4px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 
 .login-panel h1,
@@ -81,7 +105,7 @@ pre {
 }
 
 .login-form label {
-  color: #344054;
+  color: #2f3d40;
   display: grid;
   font-size: 0.92rem;
   font-weight: 650;
@@ -97,7 +121,7 @@ pre {
 
 .login-form input:focus {
   border-color: var(--accent);
-  outline: 3px solid rgba(15, 118, 110, 0.14);
+  outline: 3px solid rgba(71, 127, 104, 0.18);
 }
 
 .login-form button,
@@ -124,7 +148,7 @@ pre {
 }
 
 .button:disabled {
-  background: var(--surface-muted);
+  background: #d9dfdd;
   color: var(--muted);
   cursor: not-allowed;
 }
@@ -145,8 +169,8 @@ pre {
 }
 
 .error-banner {
-  background: #fef3f2;
-  border: 1px solid #fecdca;
+  background: #f8e9e6;
+  border: 1px solid #e4b9b2;
   border-radius: 6px;
   color: var(--danger);
   margin: 0;
@@ -160,7 +184,7 @@ pre {
 }
 
 .sidebar {
-  background: #101828;
+  background: var(--panel);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -170,6 +194,15 @@ pre {
   top: 0;
 }
 
+.sidebar::before {
+  color: #71807d;
+  content: "SYS-OPS / LOCAL";
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 18px;
+}
+
 .brand {
   display: grid;
   gap: 4px;
@@ -177,13 +210,14 @@ pre {
 }
 
 .brand span {
-  font-size: 1.2rem;
+  font-size: 1.32rem;
   font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .brand small,
 .sidebar-footer p {
-  color: #b9c0cc;
+  color: #a9b8b4;
 }
 
 .nav-links {
@@ -193,12 +227,12 @@ pre {
 
 .nav-links a {
   border-radius: 6px;
-  color: #e4e7ec;
+  color: #dfe8e5;
   padding: 10px 12px;
 }
 
 .nav-links a:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(202, 214, 210, 0.1);
   color: #fff;
 }
 
@@ -217,6 +251,7 @@ pre {
 .main-content {
   min-width: 0;
   padding: 28px;
+  position: relative;
 }
 
 .page-stack {
@@ -225,7 +260,7 @@ pre {
 }
 
 .page-header {
-  align-items: end;
+  align-items: flex-end;
   display: flex;
   justify-content: space-between;
 }
@@ -236,6 +271,7 @@ pre {
 
 .eyebrow {
   color: var(--accent-dark);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -258,14 +294,49 @@ pre {
 .metric,
 .task-card,
 .section-band,
-.empty-state {
+.empty-state,
+.posture-band {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
 
+.posture-band {
+  align-items: center;
+  background: var(--panel);
+  color: #edf4f1;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.posture-band .eyebrow {
+  color: #8fbba9;
+}
+
+.posture-band h2 {
+  font-size: 1.1rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.status-chip {
+  background: rgba(143, 187, 169, 0.12);
+  border: 1px solid rgba(143, 187, 169, 0.42);
+  border-radius: 999px;
+  color: #c9ddd6;
+  flex: 0 0 auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
 .metric {
+  border-top: 3px solid var(--border-strong);
   padding: 20px;
 }
 
@@ -278,7 +349,10 @@ pre {
 
 .metric p {
   color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.78rem;
   margin: 8px 0 0;
+  text-transform: uppercase;
 }
 
 .section-band {
@@ -304,7 +378,7 @@ pre {
 }
 
 .task-card-header {
-  align-items: start;
+  align-items: flex-start;
   display: flex;
   gap: 14px;
   justify-content: space-between;
@@ -318,6 +392,7 @@ pre {
 
 .risk {
   background: var(--surface-muted);
+  border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
   flex: 0 0 auto;
@@ -328,18 +403,18 @@ pre {
 }
 
 .risk-low {
-  background: #ecfdf3;
+  background: #e5f0e9;
   color: var(--success);
 }
 
 .risk-medium {
-  background: #fffaeb;
+  background: #f3ead9;
   color: var(--warning);
 }
 
 .risk-high,
 .risk-critical {
-  background: #fef3f2;
+  background: #f8e9e6;
   color: var(--danger);
 }
 
@@ -356,7 +431,9 @@ pre {
 
 .task-meta dt {
   color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.8rem;
+  text-transform: uppercase;
 }
 
 .task-meta dd {
@@ -418,7 +495,7 @@ pre {
 
 .report-link.active {
   border-color: var(--accent);
-  outline: 3px solid rgba(15, 118, 110, 0.12);
+  outline: 3px solid rgba(71, 127, 104, 0.16);
 }
 
 .report-link span {
@@ -486,7 +563,7 @@ pre {
 }
 
 .markdown-viewer pre {
-  background: #101828;
+  background: var(--panel);
   border-radius: 8px;
   color: #edf2f7;
   margin: 16px 0;
@@ -506,7 +583,7 @@ pre {
 .markdown-viewer li code {
   background: var(--surface-muted);
   border-radius: 4px;
-  color: #344054;
+  color: #2f3d40;
   padding: 2px 5px;
 }
 
@@ -550,6 +627,7 @@ pre {
   }
 
   .section-band,
+  .posture-band,
   .report-toolbar,
   .page-header {
     align-items: stretch;

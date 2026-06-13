@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownViewer } from "@/components/MarkdownViewer";
 import { ReportList } from "@/components/ReportList";
+import { marvinCopy } from "@/lib/marvin-copy";
 import { getReportDetail } from "@/lib/tasks";
 
 type TaskReportPageProps = {
@@ -45,8 +46,13 @@ export default async function TaskReportPage({
                 <p className="eyebrow">Report</p>
                 <h2>{detail.selectedReport.fileName}</h2>
               </div>
-              <button className="button" type="button" disabled>
-                Run task now
+              <button
+                className="button"
+                type="button"
+                disabled
+                title={marvinCopy.disabledRunTaskTitle}
+              >
+                {marvinCopy.disabledRunTask}
               </button>
             </header>
             <MarkdownViewer markdown={detail.markdown} />
@@ -54,9 +60,7 @@ export default async function TaskReportPage({
         ) : (
           <section className="empty-state">
             <h2>Report not found</h2>
-            <p className="muted">
-              Select an available Markdown report from the task report list.
-            </p>
+            <p className="muted">{marvinCopy.reportNotFound}</p>
           </section>
         )}
       </section>

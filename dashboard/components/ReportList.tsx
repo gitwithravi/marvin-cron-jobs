@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { marvinCopy } from "@/lib/marvin-copy";
 import type { ReportSummary } from "@/lib/tasks";
 
 function formatDate(value: string): string {
@@ -18,7 +19,7 @@ export function ReportList({
   const historicalReports = reports.filter((report) => !report.isLatest);
 
   if (reports.length === 0) {
-    return <p className="muted">No Markdown reports exist for this task yet.</p>;
+    return <p className="muted">{marvinCopy.noTaskReports}</p>;
   }
 
   return (

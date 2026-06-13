@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getOperationalPosture, marvinCopy } from "@/lib/marvin-copy";
 import { getTasks } from "@/lib/tasks";
 
 export default async function DashboardPage() {
@@ -9,18 +10,24 @@ export default async function DashboardPage() {
     .filter((value): value is string => Boolean(value))
     .sort()
     .at(-1);
+  const operationalPosture = getOperationalPosture(tasks);
 
   return (
     <div className="page-stack">
       <header className="page-header">
         <div>
           <p className="eyebrow">Overview</p>
-          <h1>Agent Dashboard</h1>
-          <p className="muted">
-            Operational surface for MARVIN tasks, reports, and future controls.
-          </p>
+          <h1>{marvinCopy.consoleName}</h1>
+          <p className="muted">{marvinCopy.overviewSummary}</p>
         </div>
       </header>
+      <section className="posture-band" aria-label="Operational posture">
+        <div>
+          <p className="eyebrow">System posture</p>
+          <h2>{operationalPosture}</h2>
+        </div>
+        <span className="status-chip">All tasks discovered</span>
+      </section>
       <section className="metric-grid" aria-label="Dashboard summary">
         <div className="metric">
           <span>{tasks.length}</span>
@@ -45,9 +52,7 @@ export default async function DashboardPage() {
       <section className="section-band">
         <div>
           <h2>Reports</h2>
-          <p className="muted">
-            Browse generated Markdown reports for every configured task.
-          </p>
+          <p className="muted">{marvinCopy.reportsSummary}</p>
         </div>
         <Link className="button primary" href="/dashboard/reports">
           Open reports

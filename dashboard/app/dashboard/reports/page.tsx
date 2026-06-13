@@ -1,4 +1,5 @@
 import { TaskCard } from "@/components/TaskCard";
+import { marvinCopy } from "@/lib/marvin-copy";
 import { getTasks } from "@/lib/tasks";
 
 export default async function ReportsPage() {
@@ -10,10 +11,7 @@ export default async function ReportsPage() {
         <div>
           <p className="eyebrow">Reports</p>
           <h1>Task Reports</h1>
-          <p className="muted">
-            Tasks are discovered from config files and reports are read from their
-            configured report directories.
-          </p>
+          <p className="muted">{marvinCopy.reportsSummary}</p>
         </div>
       </header>
       {tasks.length > 0 ? (
@@ -25,10 +23,7 @@ export default async function ReportsPage() {
       ) : (
         <section className="empty-state">
           <h2>No tasks discovered</h2>
-          <p className="muted">
-            Add task directories under <code>tasks/</code> with a
-            <code>config.yaml</code> file.
-          </p>
+          <p className="muted">{marvinCopy.reportsEmpty}</p>
         </section>
       )}
     </div>

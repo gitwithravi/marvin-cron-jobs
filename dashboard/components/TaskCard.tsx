@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { marvinCopy } from "@/lib/marvin-copy";
 import type { TaskSummary } from "@/lib/tasks";
 
 function formatDate(value: string | null | undefined): string {
@@ -37,8 +38,13 @@ export function TaskCard({ task }: { task: TaskSummary }) {
         <Link className="button primary" href={`/dashboard/reports/${task.taskName}`}>
           View reports
         </Link>
-        <button className="button" type="button" disabled>
-          Run task now
+        <button
+          className="button"
+          type="button"
+          disabled
+          title={marvinCopy.disabledRunTaskTitle}
+        >
+          {marvinCopy.disabledRunTask}
         </button>
       </div>
     </section>

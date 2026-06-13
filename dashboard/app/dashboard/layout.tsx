@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
+import { marvinCopy } from "@/lib/marvin-copy";
 
 export default async function DashboardLayout({
   children
@@ -12,8 +13,8 @@ export default async function DashboardLayout({
     <div className="app-shell">
       <aside className="sidebar">
         <Link href="/dashboard" className="brand">
-          <span>MARVIN</span>
-          <small>Agent Dashboard</small>
+          <span>{marvinCopy.productName}</span>
+          <small>{marvinCopy.shellSubtitle}</small>
         </Link>
         <nav className="nav-links" aria-label="Dashboard">
           <Link href="/dashboard">Overview</Link>
