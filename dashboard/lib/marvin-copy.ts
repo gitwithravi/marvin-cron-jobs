@@ -19,7 +19,14 @@ export const marvinCopy = {
   reportsEmpty:
     "No tasks discovered. Add task directories under tasks/ with a config.yaml file.",
   overviewSummary:
-    "Operational surface for MARVIN tasks, reports, and future controls. Try not to look surprised."
+    "Operational surface for MARVIN tasks, reports, and future controls. Try not to look surprised.",
+  chatTitle: "MARVIN Operations Terminal",
+  chatPlaceholder: "Inquire about status or order task execution. Keep expectations low.",
+  chatThinking: "Processing query. The CPU cycles are gone forever...",
+  chatRunning: "Executing task. Attempting to hide disappointment...",
+  chatTooltip: "Decline assistance",
+  chatConfirmBtn: "Proceed",
+  chatCancelBtn: "Cancel"
 };
 
 export function getOperationalPosture(tasks: TaskSummary[]): string {

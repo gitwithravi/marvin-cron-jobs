@@ -16,6 +16,7 @@ data/*
 !data/.gitkeep
 
 /reports/
+/alert/
 
 logs/*
 !logs/.gitkeep

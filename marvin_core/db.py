@@ -125,6 +125,40 @@ CREATE TABLE IF NOT EXISTS team_status_task_observations (
     UNIQUE (run_id, task_id),
     FOREIGN KEY (run_id) REFERENCES task_runs(id)
 );
+
+CREATE TABLE IF NOT EXISTS todo_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL UNIQUE,
+    description TEXT,
+    is_protected INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL,
+    priority TEXT NOT NULL,
+    due_date TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS todo_tag_links (
+    todo_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (todo_id, tag_id),
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES todo_tags(id) ON DELETE CASCADE
+);
+
+INSERT OR IGNORE INTO todo_tags
+    (name, name_key, description, is_protected, created_at, updated_at)
+VALUES
+    ('Others', 'others', 'Fallback tag for uncategorized todos.', 1, datetime('now'), datetime('now'));
 """
 
 

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { marvinCopy } from "@/lib/marvin-copy";
+import { ChatWidget } from "@/components/ChatWidget";
+import { ReminderButton } from "@/components/ReminderButton";
 
 export default async function DashboardLayout({
   children
@@ -19,6 +21,7 @@ export default async function DashboardLayout({
         <nav className="nav-links" aria-label="Dashboard">
           <Link href="/dashboard">Overview</Link>
           <Link href="/dashboard/reports">Reports</Link>
+          <Link href="/dashboard/todos">Todos</Link>
         </nav>
         <div className="sidebar-footer">
           <p>{session.username}</p>
@@ -29,7 +32,13 @@ export default async function DashboardLayout({
           </form>
         </div>
       </aside>
-      <main className="main-content">{children}</main>
+      <main className="main-content">
+        <div className="dashboard-topbar">
+          <ReminderButton />
+        </div>
+        {children}
+      </main>
+      <ChatWidget />
     </div>
   );
 }

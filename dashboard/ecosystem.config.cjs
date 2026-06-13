@@ -1,3 +1,5 @@
+const path = require("path");
+
 module.exports = {
   apps: [
     {
@@ -8,6 +10,17 @@ module.exports = {
       env: {
         NODE_ENV: "production"
       }
+    },
+    {
+      name: "marvin-chat-server",
+      script: path.join(__dirname, "../.venv/bin/python3"),
+      args: path.join(__dirname, "../marvin_core/chat_server.py"),
+      cwd: path.join(__dirname, ".."),
+      interpreter: "none",
+      env: {
+        PYTHONPATH: path.join(__dirname, "..")
+      }
     }
   ]
 };
+
