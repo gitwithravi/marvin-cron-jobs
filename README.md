@@ -31,7 +31,21 @@ Example cron entry:
 */15 * * * * cd /home/raviks/Development/MARVIN-Agent && . .venv/bin/activate && python -m tasks.uptime_kuma_heartbeat.run >> logs/uptime_kuma_heartbeat.log 2>&1
 ```
 
+## Telegram Notifications
+
+Set these values in `.env`:
+
+```text
+TELEGRAM_BOT_TOKEN=123456789:AA_REPLACE_WITH_BOTFATHER_TOKEN
+TELEGRAM_CHAT_ID=123456789
+```
+
+Test delivery:
+
+```bash
+.venv/bin/python tools/telegram_notification.py --message "MARVIN test notification"
+```
+
 ## Task Pattern
 
 Each task should keep its own config, prompts, runner, and tests in `tasks/<task_name>/`. Shared behavior belongs in `marvin_core/` only when multiple tasks need it.
-

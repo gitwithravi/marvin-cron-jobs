@@ -6,4 +6,9 @@ report_dir: "reports/uptime_kuma_heartbeat"
 openrouter:
   temperature: 0.2
   max_tokens: 1200
-
+notifications:
+  enabled: false
+  risk_threshold: medium
+  channels:
+    - telegram
+  include_report_path: true

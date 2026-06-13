@@ -51,7 +51,9 @@ Every task should:
 - Persist raw or near-raw facts with timestamps.
 - Build a compact factual payload for LLM analysis.
 - Send only factual payloads to the LLM.
+- Compute deterministic risk from facts before notification dispatch.
 - Write a timestamped Markdown report.
+- Dispatch notifications through the shared dispatcher when configured.
 - Support a `--dry-run` mode when practical.
 - Have focused tests for config, data shaping, prompt building, persistence, and report generation.
 
@@ -84,6 +86,12 @@ report_dir: "reports/example_task"
 openrouter:
   temperature: 0.2
   max_tokens: 1200
+notifications:
+  enabled: false
+  risk_threshold: medium
+  channels:
+    - telegram
+  include_report_path: true
 ```
 
 Use explicit config over hidden defaults. If production behavior depends on a value, put it in config.
@@ -121,6 +129,51 @@ The LLM prompt must include:
 - `communication_style.md`
 
 The LLM must not be asked to fetch facts, run commands, modify systems, send messages, or make irreversible decisions.
+
+Do not let the LLM be the sole source for alerting risk. Compute task risk deterministically from observed facts, then allow the LLM to explain that risk in the report. Models are useful. Letting them decide whether Ravi gets paged is less useful.
+
+## Notification Rules
+
+Use `marvin_core.notifications.dispatcher` for all notifications.
+
+Task config controls whether notifications are enabled, the minimum risk threshold, and the destination channels.
+
+Risk levels are ordered:
+
+```text
+low < medium < high < critical
+```
+
+If `risk_threshold` is `medium`, dispatch for `medium`, `high`, and `critical`. Do not dispatch for `low`.
+
+Supported channels:
+
+- `telegram`
+- `console` for local testing and dry operational checks
+
+Telegram credentials live in root `.env`:
+
+```text
+TELEGRAM_BOT_TOKEN=123456789:AA...
+TELEGRAM_CHAT_ID=...
+```
+
+`TELEGRAM_BOT_TOKEN` must be the BotFather API token, not the bot username. A username like `ravi_marvin_notify_bot` will fail. Telegram, in its infinite mercy, calls that a 404.
+
+Test Telegram manually with:
+
+```bash
+.venv/bin/python tools/telegram_notification.py --message "MARVIN test notification"
+```
+
+Notification messages should include:
+
+- task name
+- risk level
+- concise summary
+- report path when configured
+
+Add new channels under `marvin_core/notifications/`. Do not put channel-specific code inside task directories.
 
 ## MARVIN Communication Style
 
@@ -209,6 +262,8 @@ Each task should have tests for:
 - factual payload construction
 - prompt construction
 - report rendering
+- deterministic risk calculation
+- notification threshold behavior
 - database inserts or migrations, if the task adds schema
 - dry-run behavior, if present
 
@@ -225,9 +280,10 @@ It:
 - normalizes monitor status from the latest heartbeat when Kuma monitor status is missing
 - persists monitor snapshots, heartbeat observations, task runs, and reports
 - sends factual payloads to OpenRouter
+- computes deterministic risk from current and recent monitor status
+- dispatches notifications when configured risk threshold is met
 - uses `communication_style.md` for MARVIN-style summaries
 - writes Markdown reports under `reports/uptime_kuma_heartbeat/`
 - includes tests for persistence, analysis payloads, prompts, and report writing
 
 Future tasks should follow this pattern unless there is a concrete reason to diverge. If there is, document the reason in the task README or config comments, so future Ravi does not have to conduct archaeology at 2 AM.
-

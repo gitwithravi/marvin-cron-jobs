@@ -68,6 +68,30 @@ def build_factual_payload(
     }
 
 
+def compute_risk_level(factual_payload: dict[str, Any]) -> str:
+    fleet_counts = factual_payload.get("fleet_status_counts", {})
+    if fleet_counts.get("down", 0) > 0:
+        return "high"
+
+    monitors = factual_payload.get("monitors", [])
+    recent_down_events = sum(
+        monitor.get("status_counts", {}).get("down", 0)
+        for monitor in monitors
+    )
+    if recent_down_events > 0:
+        return "medium"
+
+    missing_data = [
+        monitor
+        for monitor in monitors
+        if monitor.get("heartbeat_count", 0) == 0 or monitor.get("current_status") in {"None", "unknown", None}
+    ]
+    if missing_data:
+        return "medium"
+
+    return "low"
+
+
 def build_messages(
     *,
     prompts_dir: Path,
@@ -90,7 +114,7 @@ def build_messages(
 
 def dry_run_analysis(factual_payload: dict[str, Any]) -> dict[str, Any]:
     down_count = factual_payload.get("fleet_status_counts", {}).get("down", 0)
-    risk_level = "high" if down_count else "low"
+    risk_level = compute_risk_level(factual_payload)
     if down_count:
         summary = f"{down_count} monitor(s) are currently down in the collected Uptime Kuma data."
         actions = ["Inspect the down monitors in Uptime Kuma and confirm whether the outage is expected."]

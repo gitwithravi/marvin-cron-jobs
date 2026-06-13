@@ -3,6 +3,7 @@ import json
 from tasks.uptime_kuma_heartbeat.analysis import (
     build_factual_payload,
     build_messages,
+    compute_risk_level,
     dry_run_analysis,
 )
 
@@ -79,3 +80,31 @@ def test_dry_run_analysis_reports_down_monitors():
     assert analysis["risk_level"] == "high"
     assert "currently down" in analysis["summary"]
     assert analysis["recommended_actions"]
+
+
+def test_compute_risk_level_uses_current_down_status():
+    assert compute_risk_level({"fleet_status_counts": {"down": 1}, "monitors": []}) == "high"
+
+
+def test_compute_risk_level_uses_recent_down_events():
+    assert (
+        compute_risk_level(
+            {
+                "fleet_status_counts": {"up": 1},
+                "monitors": [{"status_counts": {"down": 1}, "heartbeat_count": 10, "current_status": "up"}],
+            }
+        )
+        == "medium"
+    )
+
+
+def test_compute_risk_level_clean_payload_is_low():
+    assert (
+        compute_risk_level(
+            {
+                "fleet_status_counts": {"up": 1},
+                "monitors": [{"status_counts": {"up": 10}, "heartbeat_count": 10, "current_status": "up"}],
+            }
+        )
+        == "low"
+    )

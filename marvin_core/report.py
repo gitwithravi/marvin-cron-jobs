@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from marvin_core.paths import project_path
+from marvin_core.risk import normalize_risk_level
 
 
 def write_markdown_report(
@@ -15,6 +16,7 @@ def write_markdown_report(
     output_dir = project_path(report_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{timestamp_slug}.md"
+    risk_level = normalize_risk_level(analysis.get("risk_level", "low"))
 
     lines = [
         f"# {title}",
@@ -38,7 +40,7 @@ def write_markdown_report(
             "",
             "## Risk Level",
             "",
-            str(analysis.get("risk_level", "unknown")),
+            risk_level,
             "",
             "## Notable Facts",
             "",
@@ -59,4 +61,3 @@ def write_markdown_report(
     lines.extend(["```", ""])
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
-

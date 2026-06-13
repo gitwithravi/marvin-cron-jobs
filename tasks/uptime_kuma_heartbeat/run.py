@@ -16,12 +16,15 @@ from marvin_core.db import (
     migrate,
 )
 from marvin_core.env import load_root_env, require_env
+from marvin_core.notifications.dispatcher import dispatch_notifications
 from marvin_core.openrouter import OpenRouterClient
 from marvin_core.paths import ROOT_DIR, project_path
 from marvin_core.report import write_markdown_report
+from marvin_core.risk import normalize_risk_level
 from tasks.uptime_kuma_heartbeat.analysis import (
     build_factual_payload,
     build_messages,
+    compute_risk_level,
     dry_run_analysis,
 )
 from tasks.uptime_kuma_heartbeat.kuma import KumaHeartbeatClient
@@ -78,6 +81,7 @@ def run_task(*, dry_run: bool = False) -> Path:
             monitors=monitors,
             heartbeats=heartbeats,
         )
+        risk_level = compute_risk_level(factual_payload)
 
         if dry_run:
             analysis = dry_run_analysis(factual_payload)
@@ -96,6 +100,9 @@ def run_task(*, dry_run: bool = False) -> Path:
                 temperature=float(llm_config.get("temperature", 0.2)),
                 max_tokens=int(llm_config.get("max_tokens", 1200)),
             )
+            analysis["risk_level"] = risk_level
+
+        analysis["risk_level"] = normalize_risk_level(analysis.get("risk_level", risk_level))
 
         report_path = write_markdown_report(
             config["report_dir"],
@@ -104,6 +111,20 @@ def run_task(*, dry_run: bool = False) -> Path:
             factual_data=factual_payload,
             analysis=analysis,
         )
+        notification_results = dispatch_notifications(
+            task_name=config["task_name"],
+            risk_level=analysis["risk_level"],
+            analysis=analysis,
+            report_path=report_path.relative_to(ROOT_DIR) if report_path.is_relative_to(ROOT_DIR) else report_path,
+            config=config.get("notifications"),
+        )
+        if notification_results:
+            print(
+                "Notifications: "
+                + ", ".join(
+                    f"{result.channel}={result.status}" for result in notification_results
+                )
+            )
         insert_report(
             conn,
             run_id,
