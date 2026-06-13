@@ -1,0 +1,15 @@
+task_name: vityarthi_support_tickets
+model: "deepseek/deepseek-v4-flash"
+base_url: "https://admin.vityarthi.com"
+open_ticket_summary_limit: 3
+database_path: "data/marvin.sqlite3"
+report_dir: "reports/vityarthi_support_tickets"
+openrouter:
+  temperature: 0.2
+  max_tokens: 1500
+notifications:
+  enabled: false
+  risk_threshold: medium
+  channels:
+    - telegram
+  include_report_path: true

@@ -159,6 +159,36 @@ INSERT OR IGNORE INTO todo_tags
     (name, name_key, description, is_protected, created_at, updated_at)
 VALUES
     ('Others', 'others', 'Fallback tag for uncategorized todos.', 1, datetime('now'), datetime('now'));
+
+CREATE TABLE IF NOT EXISTS vityarthi_support_ticket_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    ticket_id INTEGER NOT NULL,
+    subject TEXT,
+    status TEXT,
+    priority TEXT,
+    category TEXT,
+    owner_id INTEGER,
+    owner_name TEXT,
+    owner_email TEXT,
+    created_at TEXT,
+    updated_at TEXT,
+    raw_json TEXT NOT NULL,
+    UNIQUE (run_id, ticket_id),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
+
+CREATE TABLE IF NOT EXISTS vityarthi_ticket_count_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    observed_at TEXT NOT NULL,
+    open_count INTEGER NOT NULL DEFAULT 0,
+    replied_count INTEGER NOT NULL DEFAULT 0,
+    closed_count INTEGER NOT NULL DEFAULT 0,
+    total_count INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (run_id) REFERENCES task_runs(id)
+);
 """
 
 
@@ -451,6 +481,58 @@ def insert_team_status_task_observations(
                 json.dumps(task, sort_keys=True, default=str),
             )
             for task in tasks
+        ],
+    )
+    conn.commit()
+
+
+def insert_vityarthi_support_ticket_observations(
+    conn: sqlite3.Connection,
+    run_id: int,
+    observed_at: str,
+    ticket_counts: dict[str, int],
+    open_tickets: Iterable[dict[str, Any]],
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO vityarthi_ticket_count_snapshots
+            (run_id, observed_at, open_count, replied_count, closed_count, total_count)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            observed_at,
+            ticket_counts.get("open", 0),
+            ticket_counts.get("replied", 0),
+            ticket_counts.get("closed", 0),
+            ticket_counts.get("total", 0),
+        ),
+    )
+    conn.commit()
+
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO vityarthi_support_ticket_observations
+            (run_id, observed_at, ticket_id, subject, status, priority, category, owner_id, owner_name, owner_email, created_at, updated_at, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                run_id,
+                observed_at,
+                ticket["id"],
+                ticket.get("subject"),
+                ticket.get("status"),
+                ticket.get("priority"),
+                ticket.get("category"),
+                ticket.get("owner_id"),
+                ticket.get("owner_name"),
+                ticket.get("owner_email"),
+                ticket.get("created_at"),
+                ticket.get("updated_at"),
+                json.dumps(ticket, sort_keys=True, default=str),
+            )
+            for ticket in open_tickets
         ],
     )
     conn.commit()
