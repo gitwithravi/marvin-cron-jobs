@@ -13,11 +13,19 @@ export function chatServerBaseUrl() {
 }
 
 export async function proxyToChatServer({ path, method = "GET", body }: ProxyOptions) {
-  const response = await fetch(`${chatServerBaseUrl()}${path}`, {
-    method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${chatServerBaseUrl()}${path}`, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "MARVIN chat server is unavailable." },
+      { status: 503 }
+    );
+  }
 
   const text = await response.text();
   let data: unknown = null;

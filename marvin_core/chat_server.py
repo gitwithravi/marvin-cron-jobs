@@ -1,7 +1,8 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+from collections import Counter
 
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -23,10 +24,14 @@ from marvin_core.todos import (
     retag_todo,
     update_todo,
 )
+from tasks.team_status_today.client import TeamStatusAPIError, TeamStatusClient, _validate_date
+from tasks.team_status_today.run import _require_real_env
 
 load_root_env()
 
 app = FastAPI(title="MARVIN Chat Server")
+
+VALID_TEAM_STATUS_STATUSES = ("done", "in_progress", "blocked", "planned")
 
 
 class ChatRequest(BaseModel):
@@ -65,6 +70,42 @@ class TodoRetagRequest(BaseModel):
 class TagCreateRequest(BaseModel):
     name: str
     description: str | None = None
+
+
+def build_team_status_payload(date: str) -> dict[str, Any]:
+    _validate_date(date)
+    api_url = _require_real_env("TEAM_STATUS_API_URL")
+    api_key = _require_real_env("TEAM_STATUS_API_KEY")
+
+    with TeamStatusClient(api_url, api_key) as client:
+        members = client.fetch_team_members()
+        member_payloads: list[dict[str, Any]] = []
+        for member in members:
+            member_id = member.get("id")
+            tasks = client.fetch_tasks(member_id, date)
+            status_counts = Counter((task.get("status") or "unknown") for task in tasks)
+            normalized_counts = {
+                status: status_counts.get(status, 0)
+                for status in VALID_TEAM_STATUS_STATUSES
+            }
+            normalized_counts.update(
+                {
+                    status: count
+                    for status, count in status_counts.items()
+                    if status not in VALID_TEAM_STATUS_STATUSES
+                }
+            )
+            member_payloads.append(
+                {
+                    "id": member_id,
+                    "name": member.get("name") or f"member-{member_id}",
+                    "task_count": len(tasks),
+                    "status_counts": normalized_counts,
+                    "tasks": tasks,
+                }
+            )
+
+    return {"date": date, "members": member_payloads}
 
 
 @app.post("/chat")
@@ -133,6 +174,20 @@ def todos_endpoint(status: str | None = None, tag_id: int | None = None, include
         return {"todos": list_todos(status=status, tag_id=tag_id, include_done=include_done)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/team-status")
+def team_status_endpoint(date: str):
+    try:
+        return build_team_status_payload(date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except TeamStatusAPIError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

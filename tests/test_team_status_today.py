@@ -14,6 +14,7 @@ from marvin_core.db import (
     insert_team_status_task_observations,
     migrate,
 )
+from marvin_core import chat_server
 from tasks.team_status_today import run as task_run
 from tasks.team_status_today.analysis import (
     build_factual_payload,
@@ -484,6 +485,88 @@ def test_group_tasks_by_member_collects_per_member_lists():
     assert grouped[1] == [{"id": 1, "member_id": 1}, {"id": 3, "member_id": 1}]
     assert grouped[2] == [{"id": 2, "member_id": 2}]
     assert 4 not in {1, 2}
+
+
+# ---------------------------------------------------------------------------
+# Chat server team status endpoint helpers
+# ---------------------------------------------------------------------------
+
+
+class _FakeTeamStatusClient:
+    def __init__(self, api_url: str, api_key: str) -> None:
+        self.api_url = api_url
+        self.api_key = api_key
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def fetch_team_members(self):
+        return [
+            {"id": 1, "name": "Ada"},
+            {"id": 2, "name": "Babbage"},
+        ]
+
+    def fetch_tasks(self, member_id, date):
+        if member_id == 1:
+            return [
+                {
+                    "id": 10,
+                    "member_id": 1,
+                    "title": "Design",
+                    "status": "done",
+                    "work_date": date,
+                    "project_name": "MARVIN",
+                    "notes": None,
+                },
+                {
+                    "id": 11,
+                    "member_id": 1,
+                    "title": "Unblock API",
+                    "status": "blocked",
+                    "work_date": date,
+                    "project_name": "MARVIN",
+                    "notes": "Waiting on key",
+                },
+            ]
+        return []
+
+
+def test_build_team_status_payload_fetches_live_members_and_tasks(monkeypatch):
+    monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
+    monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
+    monkeypatch.setattr(chat_server, "TeamStatusClient", _FakeTeamStatusClient)
+
+    payload = chat_server.build_team_status_payload("2026-06-13")
+
+    assert payload["date"] == "2026-06-13"
+    assert payload["members"][0]["name"] == "Ada"
+    assert payload["members"][0]["task_count"] == 2
+    assert payload["members"][0]["status_counts"]["done"] == 1
+    assert payload["members"][0]["status_counts"]["blocked"] == 1
+    assert payload["members"][1]["tasks"] == []
+
+
+def test_build_team_status_payload_rejects_bad_date(monkeypatch):
+    monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
+    monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
+    with pytest.raises(ValueError):
+        chat_server.build_team_status_payload("13-06-2026")
+
+
+def test_build_team_status_payload_surfaces_client_errors(monkeypatch):
+    class FailingClient(_FakeTeamStatusClient):
+        def fetch_team_members(self):
+            raise TeamStatusAPIError("upstream unavailable")
+
+    monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
+    monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
+    monkeypatch.setattr(chat_server, "TeamStatusClient", FailingClient)
+
+    with pytest.raises(TeamStatusAPIError, match="upstream unavailable"):
+        chat_server.build_team_status_payload("2026-06-13")
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,27 @@
 import Link from "next/link";
 import { getOperationalPosture, marvinCopy } from "@/lib/marvin-copy";
+import { getOpenRouterAccountUsage } from "@/lib/openrouter-usage";
 import { getTasks } from "@/lib/tasks";
+
+export const dynamic = "force-dynamic";
+
+const currencyFormatter = new Intl.NumberFormat("en", {
+  currency: "USD",
+  maximumFractionDigits: 4,
+  style: "currency"
+});
+
+function formatCurrency(value: number): string {
+  return currencyFormatter.format(value);
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
+}
 
 export default async function DashboardPage() {
   const tasks = await getTasks();
+  const openRouterUsage = await getOpenRouterAccountUsage();
   const tasksWithReports = tasks.filter((task) => task.reportCount > 0).length;
   const latestReports = tasks
     .map((task) => task.latestReport?.modifiedAt)
@@ -48,6 +66,76 @@ export default async function DashboardPage() {
           </span>
           <p>Latest report update</p>
         </div>
+      </section>
+      <section className="usage-panel" aria-label="OpenRouter account usage">
+        <div className="usage-panel-header">
+          <div>
+            <p className="eyebrow">OpenRouter spend</p>
+            <h2>Account usage</h2>
+            <p className="muted">Account-level credits and usage for MARVIN.</p>
+          </div>
+          {openRouterUsage.ok ? (
+            <span className="status-chip usage-chip">
+              Updated{" "}
+              {new Intl.DateTimeFormat("en", {
+                timeStyle: "short"
+              }).format(new Date(openRouterUsage.usage.fetchedAt))}
+            </span>
+          ) : null}
+        </div>
+        {openRouterUsage.ok ? (
+          <div className="usage-layout">
+            <div className="usage-donut-wrap">
+              <div
+                className="usage-donut"
+                style={{
+                  background: `conic-gradient(#477f68 ${openRouterUsage.usage.usagePercent}%, #d9dfdd 0)`
+                }}
+                aria-label={`${formatPercent(openRouterUsage.usage.usagePercent)} of OpenRouter credits used`}
+              >
+                <div>
+                  <strong>{formatPercent(openRouterUsage.usage.usagePercent)}</strong>
+                  <span>used</span>
+                </div>
+              </div>
+            </div>
+            <div className="usage-details">
+              <div className="usage-stat-grid">
+                <div>
+                  <span>{formatCurrency(openRouterUsage.usage.totalUsage)}</span>
+                  <p>Total usage</p>
+                </div>
+                <div>
+                  <span>{formatCurrency(openRouterUsage.usage.remainingCredits)}</span>
+                  <p>Remaining</p>
+                </div>
+                <div>
+                  <span>{formatCurrency(openRouterUsage.usage.totalCredits)}</span>
+                  <p>Total credits</p>
+                </div>
+              </div>
+              <div className="usage-bar" aria-hidden="true">
+                <span
+                  className="usage-bar-used"
+                  style={{ width: `${openRouterUsage.usage.usagePercent}%` }}
+                />
+              </div>
+              <div className="usage-legend">
+                <span>
+                  <i className="legend-used" /> Used
+                </span>
+                <span>
+                  <i className="legend-remaining" /> Available
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="usage-empty">
+            <h3>Usage unavailable</h3>
+            <p>{openRouterUsage.error}</p>
+          </div>
+        )}
       </section>
       <section className="section-band">
         <div>

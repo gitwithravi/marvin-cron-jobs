@@ -20,6 +20,7 @@ export default async function DashboardLayout({
         </Link>
         <nav className="nav-links" aria-label="Dashboard">
           <Link href="/dashboard">Overview</Link>
+          <Link href="/dashboard/team-status">Team Status</Link>
           <Link href="/dashboard/reports">Reports</Link>
           <Link href="/dashboard/todos">Todos</Link>
         </nav>
