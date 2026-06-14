@@ -1,81 +1,245 @@
 # MARVIN Agent
 
-MARVIN is a script-first AI agent. Each task runs as a normal script: it gathers factual data, persists it, sends a compact payload to an LLM, and writes a report.
+MARVIN is a script-first operations agent with a private web dashboard. Tasks run as normal Python scripts, collect factual data, persist observations, ask an LLM for a compact analysis, and write Markdown reports. The dashboard exposes those reports, live operational views, todos, alerts, OpenRouter usage, and chat access to MARVIN and Hermes.
 
-## Setup
+## Features
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
+- **Authenticated dashboard**: Next.js dashboard with signed HTTP-only session cookies.
+- **Report browser**: Lists generated Markdown reports by task and renders report details.
+- **Task orchestration chat**: MARVIN chat classifies dashboard requests, reads reports, and asks for confirmation before executing tasks.
+- **Hermes chat mode**: Separate dashboard chat mode for an OpenAI-compatible Hermes agent endpoint.
+- **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and chat server.
+- **Team status board**: Fetches member task status for a selected date and shows per-member summaries.
+- **OpenRouter usage panel**: Displays account credits and usage from the OpenRouter management API.
+- **Alerts**: Generates and serves latest operational alerts.
+- **Notifications**: Optional Telegram notifications per task, controlled by each task's `config.yaml`.
+- **Script-first tasks**: Uptime Kuma heartbeat, Beszel server status, team status, and VITyarthi support tickets.
 
-Edit `.env` with real values (no placeholders), then set the model slug in each task's `config.yaml` before live runs.
-
-## Hermes Dashboard Chat
-
-The dashboard chat includes a separate Hermes mode that talks to an OpenAI-compatible Hermes endpoint through the local MARVIN chat server. Configure these values in the root `.env`, then restart `marvin-chat-server`:
+## Architecture
 
 ```text
+browser
+  -> Next.js dashboard on 127.0.0.1:3030
+  -> authenticated /api/* routes
+  -> FastAPI chat server on 127.0.0.1:${CHAT_SERVER_PORT}
+  -> task scripts, SQLite data, reports, OpenRouter, Hermes, and upstream service APIs
+```
+
+The browser never calls Hermes, OpenRouter, task APIs, or the SQLite database directly. The dashboard authenticates the user, then proxies privileged operations to the local Python chat server or server-side dashboard helpers.
+
+## Production Install
+
+These instructions assume a Linux VM, a private network such as Tailscale, and nginx in front of the dashboard. The dashboard should not be exposed directly to the public internet without HTTPS and additional hardening.
+
+### 1. Install system dependencies
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv nodejs npm nginx
+sudo npm install -g pm2
+```
+
+Use Node.js 20+ for Next.js 15. If your distro ships an older Node.js, install a current LTS release from NodeSource or your preferred package source before running `npm install`.
+
+### 2. Clone and install the app
+
+```bash
+git clone <repo-url> /opt/marvin-agent
+cd /opt/marvin-agent
+
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+
+cd dashboard
+npm install
+cd ..
+```
+
+### 3. Configure root environment
+
+```bash
+cp .env.example .env
+chmod 600 .env
+```
+
+Edit `.env` and replace all placeholders needed by the features you use:
+
+```text
+OPENROUTER_API_KEY=sk-or-v1-your-key
+OPENROUTER_MANAGEMENT_KEY=sk-or-v1-your-management-key
+MARVIN_CHAT_MODEL=google/gemini-2.5-flash
+TODO_CLASSIFIER_MODEL=google/gemini-2.5-flash
+TODO_REMINDER_MODEL=google/gemini-2.5-flash
+
+UPTIME_KUMA_URL=http://localhost:3001
+UPTIME_KUMA_USERNAME=admin
+UPTIME_KUMA_PASSWORD=change-me
+
+BESZEL_URL=http://localhost:8090
+BESZEL_EMAIL=admin@example.com
+BESZEL_PASSWORD=change-me
+
+TEAM_STATUS_API_URL=https://tasks.vityarthi.com/api
+TEAM_STATUS_API_KEY=your-api-key-here
+
+VITYARTHI_SYSTEM_API_TOKEN=your-vityarthi-system-api-token-here
+
+TELEGRAM_BOT_TOKEN=123456789:AA_REPLACE_WITH_BOTFATHER_TOKEN
+TELEGRAM_CHAT_ID=123456789
+
+CHAT_SERVER_PORT=3031
+
 HERMES_BASE_URL=http://<hermes-vm-or-tailnet-name>:<port>/v1
 HERMES_MODEL=<model-name>
 HERMES_API_KEY=<optional bearer token>
 HERMES_TIMEOUT_SECONDS=60
 ```
 
-The browser does not call Hermes directly. The dashboard authenticates the session, proxies to `127.0.0.1:${CHAT_SERVER_PORT}`, and the Python chat server calls `${HERMES_BASE_URL}/chat/completions`.
+`HERMES_BASE_URL` must point to an OpenAI-compatible base URL. MARVIN calls `${HERMES_BASE_URL}/chat/completions`.
+
+### 4. Configure dashboard environment
+
+```bash
+cd dashboard
+cp .env.example .env.local
+chmod 600 .env.local
+```
+
+Create a password hash:
+
+```bash
+printf 'your-password' | sha1sum
+```
+
+Set dashboard values in `dashboard/.env.local`:
+
+```text
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD_HASH=<sha1 hash from command above>
+SESSION_SECRET=<long random secret>
+DASHBOARD_COOKIE_SECURE=false
+CHAT_SERVER_PORT=3031
+```
+
+`CHAT_SERVER_PORT` must match the root `.env`. Set `DASHBOARD_COOKIE_SECURE=true` only when the browser reaches the dashboard over HTTPS.
+
+### 5. Build and start with PM2
+
+```bash
+cd /opt/marvin-agent/dashboard
+npm run build
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup
+```
+
+The PM2 config starts:
+
+- `marvin-dashboard`: Next.js on `127.0.0.1:3030`
+- `marvin-chat-server`: FastAPI chat server using `.venv/bin/python3`
+
+Useful commands:
+
+```bash
+pm2 list
+pm2 logs marvin-dashboard
+pm2 logs marvin-chat-server
+pm2 restart marvin-dashboard marvin-chat-server
+```
+
+### 6. Configure nginx
+
+Point nginx at the local dashboard process:
+
+```nginx
+server {
+    listen 80;
+    server_name marvin.example.ts.net;
+
+    location / {
+        proxy_pass http://127.0.0.1:3030;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+Enable and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/marvin /etc/nginx/sites-enabled/marvin
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+For a Tailscale-only deployment, restrict access to the tailnet. If exposing beyond a private network, use HTTPS and set `DASHBOARD_COOKIE_SECURE=true`.
+
+### 7. Schedule tasks
+
+Each task can run manually or from cron. Example production cron entries:
+
+```cron
+*/15 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.uptime_kuma_heartbeat.run >> logs/uptime_kuma_heartbeat.log 2>&1
+*/15 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.beszel_server_status.run >> logs/beszel_server_status.log 2>&1
+*/30 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.team_status_today.run >> logs/team_status_today.log 2>&1
+*/30 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.vityarthi_support_tickets.run >> logs/vityarthi_support_tickets.log 2>&1
+```
+
+Keep `logs/.gitkeep`, `data/.gitkeep`, and generated reports on disk. Back up `data/marvin.sqlite3`, `reports/`, `.env`, and `dashboard/.env.local`.
+
+## Local Development
+
+Run the Python chat server:
+
+```bash
+. .venv/bin/activate
+python marvin_core/chat_server.py
+```
+
+Run the dashboard:
+
+```bash
+cd dashboard
+npm run dev
+```
+
+Default local URLs:
+
+- Dashboard: `http://127.0.0.1:3030`
+- Chat server: `http://127.0.0.1:${CHAT_SERVER_PORT}`
 
 ## Tasks
 
-Each task lives in `tasks/<task_name>/` with its own config, prompts, runner, and tests. Run any task with `python -m tasks.<task_name>.run`. All tasks accept `--dry-run` to skip OpenRouter and use a deterministic analysis.
+Each task lives in `tasks/<task_name>/` with its own config, prompts, runner, analysis code, and tests. All tasks support `--dry-run` when available to skip live LLM calls and produce deterministic analysis.
 
 ### Uptime Kuma Heartbeat
 
-Polls Uptime Kuma for monitor status and recent heartbeats, persists them, and flags downtime and missing data.
-
-**Env vars** (root `.env`):
-- `UPTIME_KUMA_URL`
-- `UPTIME_KUMA_USERNAME`
-- `UPTIME_KUMA_PASSWORD`
-- `OPENROUTER_API_KEY`
+Polls Uptime Kuma for monitor status and recent heartbeats, persists observations, and flags downtime or missing data.
 
 ```bash
 python -m tasks.uptime_kuma_heartbeat.run
 python -m tasks.uptime_kuma_heartbeat.run --dry-run
 ```
 
-```cron
-*/15 * * * * cd /home/raviks/Development/MARVIN-Agent && . .venv/bin/activate && python -m tasks.uptime_kuma_heartbeat.run >> logs/uptime_kuma_heartbeat.log 2>&1
-```
-
 ### Beszel Server Status
 
-Polls Beszel for systems, containers, alerts, and recent alert history. Persists everything, then surfaces systems that are down, alerts that are triggered, and unresolved history.
-
-**Env vars** (root `.env`):
-- `BESZEL_URL`
-- `BESZEL_EMAIL`
-- `BESZEL_PASSWORD`
-- `OPENROUTER_API_KEY`
+Polls Beszel for systems, containers, alerts, and recent alert history, then reports down systems and unresolved alert history.
 
 ```bash
 python -m tasks.beszel_server_status.run
 python -m tasks.beszel_server_status.run --dry-run
 ```
 
-```cron
-*/15 * * * * cd /home/raviks/Development/MARVIN-Agent && . .venv/bin/activate && python -m tasks.beszel_server_status.run >> logs/beszel_server_status.log 2>&1
-```
-
 ### Team Status Today
 
-Fetches today's task status for each member from the team status API (`X-API-Key` auth). 404/422 are treated as empty data; 401 (bad key) and 503 (server key not configured) are fatal. Transient timeouts and connection errors are retried with exponential backoff. The script refuses to run when env vars are missing or still set to placeholder values.
-
-**Env vars** (root `.env`):
-- `TEAM_STATUS_API_URL`
-- `TEAM_STATUS_API_KEY`
-- `OPENROUTER_API_KEY`
+Fetches team members and date-specific tasks from the team status API. It treats 404/422 as empty data and fails on auth or server configuration problems.
 
 ```bash
 python -m tasks.team_status_today.run
@@ -83,20 +247,37 @@ python -m tasks.team_status_today.run --date 2026-06-12
 python -m tasks.team_status_today.run --dry-run
 ```
 
-```cron
-*/30 * * * * cd /home/raviks/Development/MARVIN-Agent && . .venv/bin/activate && python -m tasks.team_status_today.run >> logs/team_status_today.log 2>&1
+### VITyarthi Support Tickets
+
+Fetches support ticket counts and open ticket details from the VITyarthi admin API, then writes a compact support status report.
+
+```bash
+python -m tasks.vityarthi_support_tickets.run
+python -m tasks.vityarthi_support_tickets.run --dry-run
 ```
 
-## Telegram Notifications
+## Chat And Dashboard APIs
 
-Set these values in `.env`:
+The Python chat server exposes local-only endpoints used by the dashboard:
+
+- `POST /chat`: MARVIN task/report conversation.
+- `POST /chat/confirm`: confirmed task execution.
+- `POST /hermes/chat`: Hermes chat through OpenAI-compatible API.
+- `GET /todos`, `POST /todos`, `PATCH /todos/{id}`: todo operations.
+- `GET /todo-tags`, `POST /todo-tags`: tag operations.
+- `GET /team-status?date=YYYY-MM-DD`: live team status board payload.
+- `GET /alerts/latest`, `POST /alerts/refresh`: alert display and refresh.
+
+The dashboard wraps these with authenticated `/api/*` routes. Unauthenticated requests return `401`.
+
+## Notifications
+
+Set Telegram credentials in `.env`:
 
 ```text
 TELEGRAM_BOT_TOKEN=123456789:AA_REPLACE_WITH_BOTFATHER_TOKEN
 TELEGRAM_CHAT_ID=123456789
 ```
-
-`TELEGRAM_BOT_TOKEN` must be the BotFather API token (e.g. `123456789:AA...`), not the bot username.
 
 Test delivery:
 
@@ -104,8 +285,43 @@ Test delivery:
 .venv/bin/python tools/telegram_notification.py --message "MARVIN test notification"
 ```
 
-Each task's `config.yaml` controls whether notifications are enabled, the minimum risk threshold, and the destination channels.
+Each task's `config.yaml` controls whether notifications are enabled, the risk threshold, channels, and whether to include the report path.
+
+## Verification
+
+Run backend tests:
+
+```bash
+.venv/bin/python -m pytest
+```
+
+Run dashboard checks:
+
+```bash
+cd dashboard
+npm run build
+```
+
+Basic production smoke checks:
+
+```bash
+curl -I http://127.0.0.1:3030/login
+curl -s http://127.0.0.1:${CHAT_SERVER_PORT}/todo-tags
+curl -i -s -X POST http://127.0.0.1:3030/api/hermes-converse \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"ping","history":[]}'
+```
+
+The last command should return `401 Unauthorized` unless you include a valid dashboard session cookie.
+
+## Security Notes
+
+- Keep `.env` and `dashboard/.env.local` private; they contain password-equivalent and API credentials.
+- Do not expose the FastAPI chat server directly. It is intended to bind to `127.0.0.1`.
+- Do not expose the dashboard outside a private network without HTTPS.
+- Use a long random `SESSION_SECRET`.
+- Rotate `DASHBOARD_PASSWORD_HASH`, OpenRouter keys, Hermes keys, and upstream service credentials if a VM snapshot or env file leaks.
 
 ## Task Pattern
 
-Each task keeps its own config, prompts, runner, and tests in `tasks/<task_name>/`. Shared behavior belongs in `marvin_core/` only when multiple tasks need it. See `TASK_CREATION_GUIDELINE.md` for the full pattern.
+Each task keeps its own config, prompts, runner, analysis, and tests under `tasks/<task_name>/`. Shared behavior belongs in `marvin_core/` only when multiple tasks need it. See `TASK_CREATION_GUIDELINE.md` for the full pattern.
