@@ -21,8 +21,11 @@ export const marvinCopy = {
   overviewSummary:
     "Operational surface for MARVIN tasks, reports, and future controls. Try not to look surprised.",
   chatTitle: "MARVIN Operations Terminal",
+  hermesChatTitle: "Hermes Agent Chat",
   chatPlaceholder: "Inquire about status or order task execution. Keep expectations low.",
+  hermesChatPlaceholder: "Message Hermes...",
   chatThinking: "Processing query. The CPU cycles are gone forever...",
+  hermesChatThinking: "Waiting for Hermes...",
   chatRunning: "Executing task. Attempting to hide disappointment...",
   chatTooltip: "Decline assistance",
   chatConfirmBtn: "Proceed",

@@ -24,6 +24,8 @@ DASHBOARD_PASSWORD_HASH=<sha1 hash>
 SESSION_SECRET=<long random string>
 ```
 
+The floating chat has MARVIN and Hermes modes. MARVIN/Hermes calls both go through the Python chat server on `CHAT_SERVER_PORT`; configure Hermes in the root `.env` with `HERMES_BASE_URL`, `HERMES_MODEL`, optional `HERMES_API_KEY`, and `HERMES_TIMEOUT_SECONDS`.
+
 Run locally:
 
 ```bash

@@ -13,6 +13,19 @@ cp .env.example .env
 
 Edit `.env` with real values (no placeholders), then set the model slug in each task's `config.yaml` before live runs.
 
+## Hermes Dashboard Chat
+
+The dashboard chat includes a separate Hermes mode that talks to an OpenAI-compatible Hermes endpoint through the local MARVIN chat server. Configure these values in the root `.env`, then restart `marvin-chat-server`:
+
+```text
+HERMES_BASE_URL=http://<hermes-vm-or-tailnet-name>:<port>/v1
+HERMES_MODEL=<model-name>
+HERMES_API_KEY=<optional bearer token>
+HERMES_TIMEOUT_SECONDS=60
+```
+
+The browser does not call Hermes directly. The dashboard authenticates the session, proxies to `127.0.0.1:${CHAT_SERVER_PORT}`, and the Python chat server calls `${HERMES_BASE_URL}/chat/completions`.
+
 ## Tasks
 
 Each task lives in `tasks/<task_name>/` with its own config, prompts, runner, and tests. Run any task with `python -m tasks.<task_name>.run`. All tasks accept `--dry-run` to skip OpenRouter and use a deterministic analysis.

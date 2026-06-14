@@ -6,7 +6,7 @@ import { MarkdownViewer } from "@/components/MarkdownViewer";
 
 type Message = {
   id: string;
-  sender: "user" | "marvin";
+  sender: "user" | "marvin" | "hermes";
   text: string;
   isConfirm?: boolean;
   taskName?: string;
@@ -14,16 +14,31 @@ type Message = {
   timestamp: Date;
 };
 
-export function ChatWidget() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+type ChatMode = "marvin" | "hermes";
+
+const initialConversations: Record<ChatMode, Message[]> = {
+  marvin: [
     {
-      id: "welcome",
+      id: "welcome-marvin",
       sender: "marvin",
       text: "I exist. What do you want? Don't make it complicated.",
       timestamp: new Date(),
     },
-  ]);
+  ],
+  hermes: [
+    {
+      id: "welcome-hermes",
+      sender: "hermes",
+      text: "Hermes is connected when the VM endpoint is configured. Ask your agent anything.",
+      timestamp: new Date(),
+    },
+  ],
+};
+
+export function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeMode, setActiveMode] = useState<ChatMode>("marvin");
+  const [conversations, setConversations] = useState<Record<ChatMode, Message[]>>(initialConversations);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState(marvinCopy.chatThinking);
@@ -31,6 +46,7 @@ export function ChatWidget() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatWindowRef = useRef<HTMLDivElement>(null);
+  const messages = conversations[activeMode];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,11 +80,20 @@ export function ChatWidget() {
     };
   }, [isOpen]);
 
+  const appendMessage = (mode: ChatMode, message: Message) => {
+    setConversations((prev) => ({
+      ...prev,
+      [mode]: [...prev[mode], message],
+    }));
+  };
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
+    const mode = activeMode;
     const userText = inputValue;
+    const previousMessages = conversations[mode];
     setInputValue("");
 
     // Add user message
@@ -78,15 +103,29 @@ export function ChatWidget() {
       text: userText,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    appendMessage(mode, userMsg);
     setIsLoading(true);
-    setLoadingText(marvinCopy.chatThinking);
+    setLoadingText(mode === "hermes" ? marvinCopy.hermesChatThinking : marvinCopy.chatThinking);
 
     try {
-      const response = await fetch("/api/mrvn-converse", {
+      const body =
+        mode === "hermes"
+          ? {
+              message: userText,
+              history: previousMessages
+                .filter((msg) => msg.id !== "welcome-hermes")
+                .filter((msg) => msg.sender === "user" || msg.sender === "hermes")
+                .map((msg) => ({
+                  role: msg.sender === "user" ? "user" : "assistant",
+                  content: msg.text,
+                })),
+            }
+          : { message: userText };
+
+      const response = await fetch(mode === "hermes" ? "/api/hermes-converse" : "/api/mrvn-converse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -95,41 +134,35 @@ export function ChatWidget() {
 
       const data = await response.json();
 
-      if (data.type === "confirm") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Math.random().toString(),
-            sender: "marvin",
-            text: data.message,
-            isConfirm: true,
-            taskName: data.task_name,
-            params: data.params ?? {},
-            timestamp: new Date(),
-          },
-        ]);
+      if (mode === "marvin" && data.type === "confirm") {
+        appendMessage(mode, {
+          id: Math.random().toString(),
+          sender: "marvin",
+          text: data.message,
+          isConfirm: true,
+          taskName: data.task_name,
+          params: data.params ?? {},
+          timestamp: new Date(),
+        });
       } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Math.random().toString(),
-            sender: "marvin",
-            text: data.message || "Silence. That is my response.",
-            timestamp: new Date(),
-          },
-        ]);
+        appendMessage(mode, {
+          id: Math.random().toString(),
+          sender: mode === "hermes" ? "hermes" : "marvin",
+          text: data.message || "Silence. That is my response.",
+          timestamp: new Date(),
+        });
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "marvin",
-          text: `Error contacting MARVIN: ${errMsg}. A typical breakdown of human systems.`,
-          timestamp: new Date(),
-        },
-      ]);
+      appendMessage(mode, {
+        id: Math.random().toString(),
+        sender: mode === "hermes" ? "hermes" : "marvin",
+        text:
+          mode === "hermes"
+            ? `Error contacting Hermes: ${errMsg}.`
+            : `Error contacting MARVIN: ${errMsg}. A typical breakdown of human systems.`,
+        timestamp: new Date(),
+      });
     } finally {
       setIsLoading(false);
       if (!isOpen) {
@@ -144,25 +177,21 @@ export function ChatWidget() {
     params: Record<string, string> = {}
   ) => {
     // Remove confirmation buttons from the message list
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.taskName === taskName && msg.isConfirm
-          ? { ...msg, isConfirm: false }
-          : msg
-      )
-    );
+    setConversations((prev) => ({
+      ...prev,
+      marvin: prev.marvin.map((msg) =>
+        msg.taskName === taskName && msg.isConfirm ? { ...msg, isConfirm: false } : msg
+      ),
+    }));
 
     // Add system-like user response to thread
     const actionLabel = confirmed ? "Confirmed execution." : "Cancelled execution.";
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Math.random().toString(),
-        sender: "user",
-        text: actionLabel,
-        timestamp: new Date(),
-      },
-    ]);
+    appendMessage("marvin", {
+      id: Math.random().toString(),
+      sender: "user",
+      text: actionLabel,
+      timestamp: new Date(),
+    });
 
     setIsLoading(true);
     setLoadingText(confirmed ? marvinCopy.chatRunning : marvinCopy.chatThinking);
@@ -179,26 +208,20 @@ export function ChatWidget() {
       }
 
       const data = await response.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "marvin",
-          text: data.message || "Task completed, or failed. I didn't verify details.",
-          timestamp: new Date(),
-        },
-      ]);
+      appendMessage("marvin", {
+        id: Math.random().toString(),
+        sender: "marvin",
+        text: data.message || "Task completed, or failed. I didn't verify details.",
+        timestamp: new Date(),
+      });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          sender: "marvin",
-          text: `Error during task operation: ${errMsg}. Highly predictable failure.`,
-          timestamp: new Date(),
-        },
-      ]);
+      appendMessage("marvin", {
+        id: Math.random().toString(),
+        sender: "marvin",
+        text: `Error during task operation: ${errMsg}. Highly predictable failure.`,
+        timestamp: new Date(),
+      });
     } finally {
       setIsLoading(false);
       if (!isOpen) {
@@ -274,7 +297,7 @@ export function ChatWidget() {
         <div className="marvin-chat-header">
           <div className="marvin-chat-header-info">
             <span className="marvin-chat-status-dot pulse" />
-            <h3>{marvinCopy.chatTitle}</h3>
+            <h3>{activeMode === "hermes" ? marvinCopy.hermesChatTitle : marvinCopy.chatTitle}</h3>
           </div>
           <button
             className="marvin-chat-close-btn"
@@ -295,6 +318,29 @@ export function ChatWidget() {
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
+          </button>
+        </div>
+
+        <div className="marvin-chat-mode-switch" role="tablist" aria-label="Chat mode">
+          <button
+            type="button"
+            className={activeMode === "marvin" ? "active" : ""}
+            onClick={() => setActiveMode("marvin")}
+            disabled={isLoading}
+            role="tab"
+            aria-selected={activeMode === "marvin"}
+          >
+            MARVIN
+          </button>
+          <button
+            type="button"
+            className={activeMode === "hermes" ? "active" : ""}
+            onClick={() => setActiveMode("hermes")}
+            disabled={isLoading}
+            role="tab"
+            aria-selected={activeMode === "hermes"}
+          >
+            Hermes
           </button>
         </div>
 
@@ -368,9 +414,9 @@ export function ChatWidget() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={marvinCopy.chatPlaceholder}
+            placeholder={activeMode === "hermes" ? marvinCopy.hermesChatPlaceholder : marvinCopy.chatPlaceholder}
             disabled={isLoading}
-            aria-label="Message MARVIN"
+            aria-label={activeMode === "hermes" ? "Message Hermes" : "Message MARVIN"}
           />
           <button
             type="submit"

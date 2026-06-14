@@ -15,6 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 from marvin_core.agent import process_message, execute_task, read_report, format_response
 from marvin_core.alerts import generate_alert, read_latest_alert
 from marvin_core.env import load_root_env
+from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
 from marvin_core.todos import (
     classify_and_apply_tags,
     create_tag,
@@ -36,6 +37,16 @@ VALID_TEAM_STATUS_STATUSES = ("done", "in_progress", "blocked", "planned")
 
 class ChatRequest(BaseModel):
     message: str
+
+
+class HermesHistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class HermesChatRequest(BaseModel):
+    message: str
+    history: list[HermesHistoryMessage] | None = None
 
 
 class ConfirmRequest(BaseModel):
@@ -113,6 +124,23 @@ def chat_endpoint(payload: ChatRequest):
     try:
         response = process_message(payload.message)
         return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/hermes/chat")
+def hermes_chat_endpoint(payload: HermesChatRequest):
+    try:
+        history = [
+            {"role": item.role, "content": item.content}
+            for item in payload.history or []
+        ]
+        message = chat_with_hermes(payload.message, history)
+        return {"type": "response", "message": message}
+    except HermesConfigError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except HermesClientError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

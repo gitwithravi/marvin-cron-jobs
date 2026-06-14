@@ -1116,6 +1116,38 @@ pre {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.marvin-chat-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.marvin-chat-mode-switch button {
+  border: 1px solid var(--border);
+  background: #eef2f1;
+  color: var(--muted);
+  border-radius: 6px;
+  min-height: 32px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.marvin-chat-mode-switch button.active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.marvin-chat-mode-switch button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .marvin-chat-messages {
   flex: 1;
   padding: 16px;
