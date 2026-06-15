@@ -7,6 +7,7 @@ from collections import Counter
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
+from requests import RequestException
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -14,6 +15,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from marvin_core.agent import process_message, execute_task, read_report, format_response
 from marvin_core.alerts import generate_alert, read_latest_alert
+from marvin_core.beszel_live import fetch_beszel_live_payload
 from marvin_core.env import load_root_env
 from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
 from marvin_core.todos import (
@@ -213,6 +215,18 @@ def team_status_endpoint(date: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except TeamStatusAPIError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/beszel")
+def beszel_endpoint():
+    try:
+        return fetch_beszel_live_payload()
+    except RequestException as e:
         raise HTTPException(status_code=502, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -541,6 +541,223 @@ pre {
   margin: 8px 0 0;
 }
 
+.beszel-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.beszel-toolbar,
+.beszel-panel,
+.beszel-system-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.beszel-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.beszel-toolbar h2,
+.beszel-system-card h2,
+.beszel-panel h2,
+.beszel-empty-panel h3 {
+  margin: 0;
+}
+
+.beszel-system-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.beszel-system-card {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.beszel-system-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.beszel-system-header p {
+  color: var(--muted);
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.beszel-status {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.beszel-status-up {
+  background: #e5f0e9;
+  color: var(--success);
+}
+
+.beszel-status-down {
+  background: #f8e9e6;
+  color: var(--danger);
+}
+
+.beszel-status-unknown {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.beszel-spark-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.beszel-spark {
+  background: #f1f5f3;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.beszel-spark div {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.beszel-spark span,
+.beszel-system-meta,
+.beszel-panel-header span,
+.beszel-list small {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.beszel-spark strong {
+  font-size: 1.05rem;
+}
+
+.beszel-spark svg {
+  display: block;
+  height: 58px;
+  margin-top: 8px;
+  overflow: visible;
+  width: 100%;
+}
+
+.beszel-spark line {
+  stroke: #c8d2cf;
+  stroke-width: 1;
+}
+
+.beszel-spark path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.beszel-spark text {
+  fill: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+.beszel-system-meta {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.beszel-system-meta span {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  padding: 5px 8px;
+}
+
+.beszel-detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.beszel-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.beszel-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.beszel-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 0;
+}
+
+.beszel-list li {
+  background: #f1f5f3;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.beszel-list strong,
+.beszel-list span,
+.beszel-list small {
+  overflow-wrap: anywhere;
+}
+
+.beszel-list span {
+  color: var(--muted);
+}
+
+.beszel-empty-panel {
+  background: #f1f5f3;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  padding: 16px;
+}
+
 .section-band h2,
 .task-card h2,
 .empty-state h2,
@@ -948,11 +1165,17 @@ pre {
 
   .section-band,
   .posture-band,
+  .beszel-toolbar,
+  .beszel-panel-header,
   .usage-panel-header,
   .report-toolbar,
   .page-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .beszel-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .usage-layout {
@@ -971,6 +1194,11 @@ pre {
   }
 
   .usage-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .beszel-system-grid,
+  .beszel-spark-grid {
     grid-template-columns: 1fr;
   }
 
