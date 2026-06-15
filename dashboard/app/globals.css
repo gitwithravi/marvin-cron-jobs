@@ -2382,6 +2382,71 @@ label {
   padding: 14px;
 }
 
+.status-pages-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.status-tabs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 12px 18px;
+  text-transform: capitalize;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:first-child {
+  border-radius: 7px 0 0 0;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  border-bottom-color: var(--accent-dark);
+  color: var(--text);
+}
+
+.tab-external {
+  border-bottom-color: transparent;
+  color: var(--accent-dark);
+  font-weight: 500;
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.tab-external:hover {
+  color: var(--accent);
+}
+
+.status-page-iframe {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  display: block;
+  min-height: 620px;
+  width: 100%;
+}
+
 @media (max-width: 900px) {
   .app-shell,
   .todo-layout {
