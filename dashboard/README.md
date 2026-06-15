@@ -7,7 +7,7 @@ The dashboard is a private Next.js interface for MARVIN. It provides authenticat
 - Session-based login with HTTP-only signed cookies.
 - Overview page with task/report posture and OpenRouter account usage.
 - Report list and Markdown report viewer.
-- Team status board backed by the local Python chat server.
+- Team status board backed by the local Python MARVIN API.
 - Todo manager with tag creation, updates, and retagging.
 - Floating chat with two modes:
   - `MARVIN`: report lookup and confirmed task execution.
@@ -35,10 +35,10 @@ DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD_HASH=<sha1 hash>
 SESSION_SECRET=<long random string>
 DASHBOARD_COOKIE_SECURE=false
-CHAT_SERVER_PORT=3031
+MARVIN_API_PORT=3031
 ```
 
-`CHAT_SERVER_PORT` must match the root `.env` used by `marvin_core/chat_server.py`.
+`MARVIN_API_PORT` must match the root `.env` used by `marvin_core/marvin_api.py`.
 
 Run locally:
 
@@ -62,7 +62,7 @@ pm2 save
 `ecosystem.config.cjs` starts both required services:
 
 - `marvin-dashboard`: `next start --hostname 127.0.0.1 --port 3030`
-- `marvin-chat-server`: `../.venv/bin/python3 ../marvin_core/chat_server.py`
+- `marvin-api`: `../.venv/bin/python3 ../marvin_core/marvin_api.py`
 
 Place nginx in front of `http://127.0.0.1:3030` and preserve `Host`, `X-Forwarded-Host`, and `X-Forwarded-Proto` headers. Keep the dashboard private to Tailscale or another trusted network unless HTTPS is configured.
 
@@ -71,8 +71,8 @@ Place nginx in front of `http://127.0.0.1:3030` and preserve `Host`, `X-Forwarde
 ```bash
 pm2 list
 pm2 logs marvin-dashboard
-pm2 logs marvin-chat-server
-pm2 restart marvin-dashboard marvin-chat-server
+pm2 logs marvin-api
+pm2 restart marvin-dashboard marvin-api
 ```
 
 Smoke checks:
@@ -93,4 +93,4 @@ See the root `README.md` for full production installation, root environment vari
 - `DASHBOARD_PASSWORD_HASH` is password-equivalent if leaked.
 - Use a long random `SESSION_SECRET`.
 - Set `DASHBOARD_COOKIE_SECURE=true` only when the browser reaches the dashboard over HTTPS.
-- Do not expose the Python chat server directly.
+- Do not expose the Python MARVIN API directly.

@@ -144,7 +144,7 @@ export function ChatWidget() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to contact chat server");
+        throw new Error("Failed to contact MARVIN API");
       }
 
       const data = await response.json();

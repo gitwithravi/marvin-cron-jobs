@@ -8,7 +8,7 @@ MARVIN is a script-first operations agent with a private web dashboard. Tasks ru
 - **Report browser**: Lists generated Markdown reports by task and renders report details.
 - **Task orchestration chat**: MARVIN chat classifies dashboard requests, reads reports, and asks for confirmation before executing tasks.
 - **Hermes chat mode**: Separate dashboard chat mode for an OpenAI-compatible Hermes agent endpoint.
-- **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and chat server.
+- **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and MARVIN API.
 - **Invoice reimbursement tracker**: Upload invoice PDFs, extract reimbursement fields with OpenRouter, confirm them, store records in SQLite, and archive PDFs locally.
 - **Team status board**: Fetches member task status for a selected date and shows per-member summaries.
 - **OpenRouter usage panel**: Displays account credits and usage from the OpenRouter management API.
@@ -22,11 +22,11 @@ MARVIN is a script-first operations agent with a private web dashboard. Tasks ru
 browser
   -> Next.js dashboard on 127.0.0.1:3030
   -> authenticated /api/* routes
-  -> FastAPI chat server on 127.0.0.1:${CHAT_SERVER_PORT}
+  -> FastAPI MARVIN API on 127.0.0.1:${MARVIN_API_PORT}
   -> task scripts, SQLite data, reports, OpenRouter, Hermes, and upstream service APIs
 ```
 
-The browser never calls Hermes, OpenRouter, task APIs, or the SQLite database directly. The dashboard authenticates the user, then proxies privileged operations to the local Python chat server or server-side dashboard helpers.
+The browser never calls Hermes, OpenRouter, task APIs, or the SQLite database directly. The dashboard authenticates the user, then proxies privileged operations to the local Python MARVIN API or server-side dashboard helpers.
 
 ## Production Install
 
@@ -91,7 +91,7 @@ VITYARTHI_SYSTEM_API_TOKEN=your-vityarthi-system-api-token-here
 TELEGRAM_BOT_TOKEN=123456789:AA_REPLACE_WITH_BOTFATHER_TOKEN
 TELEGRAM_CHAT_ID=123456789
 
-CHAT_SERVER_PORT=3031
+MARVIN_API_PORT=3031
 
 HERMES_BASE_URL=http://<hermes-vm-or-tailnet-name>:<port>/v1
 HERMES_MODEL=<model-name>
@@ -124,10 +124,10 @@ DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD_HASH=<sha1 hash from command above>
 SESSION_SECRET=<long random secret>
 DASHBOARD_COOKIE_SECURE=false
-CHAT_SERVER_PORT=3031
+MARVIN_API_PORT=3031
 ```
 
-`CHAT_SERVER_PORT` must match the root `.env`. Set `DASHBOARD_COOKIE_SECURE=true` only when the browser reaches the dashboard over HTTPS.
+`MARVIN_API_PORT` must match the root `.env`. Set `DASHBOARD_COOKIE_SECURE=true` only when the browser reaches the dashboard over HTTPS.
 
 ### 5. Build and start with PM2
 
@@ -142,15 +142,15 @@ pm2 startup
 The PM2 config starts:
 
 - `marvin-dashboard`: Next.js on `127.0.0.1:3030`
-- `marvin-chat-server`: FastAPI chat server using `.venv/bin/python3`
+- `marvin-api`: FastAPI MARVIN API using `.venv/bin/python3`
 
 Useful commands:
 
 ```bash
 pm2 list
 pm2 logs marvin-dashboard
-pm2 logs marvin-chat-server
-pm2 restart marvin-dashboard marvin-chat-server
+pm2 logs marvin-api
+pm2 restart marvin-dashboard marvin-api
 ```
 
 ### 6. Configure nginx
@@ -201,11 +201,11 @@ Keep `logs/.gitkeep`, `data/.gitkeep`, and generated reports on disk. Back up `d
 
 ## Local Development
 
-Run the Python chat server:
+Run the Python MARVIN API:
 
 ```bash
 . .venv/bin/activate
-python marvin_core/chat_server.py
+python marvin_core/marvin_api.py
 ```
 
 Run the dashboard:
@@ -218,7 +218,7 @@ npm run dev
 Default local URLs:
 
 - Dashboard: `http://127.0.0.1:3030`
-- Chat server: `http://127.0.0.1:${CHAT_SERVER_PORT}`
+- MARVIN API: `http://127.0.0.1:${MARVIN_API_PORT}`
 
 ## Tasks
 
@@ -261,9 +261,9 @@ python -m tasks.vityarthi_support_tickets.run
 python -m tasks.vityarthi_support_tickets.run --dry-run
 ```
 
-## Chat And Dashboard APIs
+## MARVIN API And Dashboard APIs
 
-The Python chat server exposes local-only endpoints used by the dashboard:
+The Python MARVIN API exposes local-only endpoints used by the dashboard:
 
 - `POST /chat`: MARVIN task/report conversation.
 - `POST /chat/confirm`: confirmed task execution.
@@ -311,7 +311,7 @@ Basic production smoke checks:
 
 ```bash
 curl -I http://127.0.0.1:3030/login
-curl -s http://127.0.0.1:${CHAT_SERVER_PORT}/todo-tags
+curl -s http://127.0.0.1:${MARVIN_API_PORT}/todo-tags
 curl -i -s -X POST http://127.0.0.1:3030/api/hermes-converse \
   -H 'Content-Type: application/json' \
   -d '{"message":"ping","history":[]}'
@@ -322,7 +322,7 @@ The last command should return `401 Unauthorized` unless you include a valid das
 ## Security Notes
 
 - Keep `.env` and `dashboard/.env.local` private; they contain password-equivalent and API credentials.
-- Do not expose the FastAPI chat server directly. It is intended to bind to `127.0.0.1`.
+- Do not expose the FastAPI MARVIN API directly. It is intended to bind to `127.0.0.1`.
 - Do not expose the dashboard outside a private network without HTTPS.
 - Use a long random `SESSION_SECRET`.
 - Rotate `DASHBOARD_PASSWORD_HASH`, OpenRouter keys, Hermes keys, and upstream service credentials if a VM snapshot or env file leaks.

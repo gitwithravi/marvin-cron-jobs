@@ -7,22 +7,22 @@ type ProxyOptions = {
   body?: unknown;
 };
 
-export function chatServerBaseUrl() {
-  const chatServerPort = process.env.CHAT_SERVER_PORT || "3031";
-  return `http://127.0.0.1:${chatServerPort}`;
+export function marvinApiBaseUrl() {
+  const marvinApiPort = process.env.MARVIN_API_PORT || "3031";
+  return `http://127.0.0.1:${marvinApiPort}`;
 }
 
-export async function proxyToChatServer({ path, method = "GET", body }: ProxyOptions) {
+export async function proxyToMarvinApi({ path, method = "GET", body }: ProxyOptions) {
   let response: Response;
   try {
-    response = await fetch(`${chatServerBaseUrl()}${path}`, {
+    response = await fetch(`${marvinApiBaseUrl()}${path}`, {
       method,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
   } catch {
     return NextResponse.json(
-      { error: "MARVIN chat server is unavailable." },
+      { error: "MARVIN API is unavailable." },
       { status: 503 }
     );
   }
@@ -38,7 +38,7 @@ export async function proxyToChatServer({ path, method = "GET", body }: ProxyOpt
   }
 
   if (!response.ok) {
-    return NextResponse.json(data ?? { error: "Chat server error" }, { status: response.status });
+    return NextResponse.json(data ?? { error: "MARVIN API error" }, { status: response.status });
   }
   return NextResponse.json(data);
 }

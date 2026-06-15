@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi import HTTPException
 
-from marvin_core.chat_server import get_runs_endpoint, get_run_endpoint, generate_run_summary_endpoint
+from marvin_core.marvin_api import get_runs_endpoint, get_run_endpoint, generate_run_summary_endpoint
 from marvin_core.db import connect, migrate, create_task_run, insert_task_run_payload, insert_marvin_summary
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def test_db(tmp_path, monkeypatch):
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-    monkeypatch.setattr("marvin_core.chat_server.connect", fake_connect)
+    monkeypatch.setattr("marvin_core.marvin_api.connect", fake_connect)
     
     conn = fake_connect(db_path)
     migrate(conn)
@@ -75,7 +75,7 @@ def test_api_generate_and_cache_summary(test_db, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "fake-key")
     
     # Patch OpenRouterClient
-    with patch("marvin_core.chat_server.OpenRouterClient", return_value=mock_or_client):
+    with patch("marvin_core.marvin_api.OpenRouterClient", return_value=mock_or_client):
         # First request generates the summary via LLM
         data1 = generate_run_summary_endpoint(run_id)
         assert data1["summary"] == "LLM generated summary"

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { marvinApiBaseUrl } from "@/lib/marvin-server";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -14,10 +15,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message must be a string" }, { status: 400 });
     }
 
-    const chatServerPort = process.env.CHAT_SERVER_PORT || "3031";
-    const chatServerUrl = `http://127.0.0.1:${chatServerPort}/chat`;
+    const marvinApiUrl = `${marvinApiBaseUrl()}/chat`;
 
-    const response = await fetch(chatServerUrl, {
+    const response = await fetch(marvinApiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       return NextResponse.json(
-        { error: `Chat server error: ${errorText}` },
+        { error: `MARVIN API error: ${errorText}` },
         { status: response.status }
       );
     }

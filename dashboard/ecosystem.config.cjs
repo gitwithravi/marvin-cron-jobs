@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const path = require("path");
 
 module.exports = {
@@ -12,9 +13,9 @@ module.exports = {
       }
     },
     {
-      name: "marvin-chat-server",
+      name: "marvin-api",
       script: path.join(__dirname, "../.venv/bin/python3"),
-      args: path.join(__dirname, "../marvin_core/chat_server.py"),
+      args: path.join(__dirname, "../marvin_core/marvin_api.py"),
       cwd: path.join(__dirname, ".."),
       interpreter: "none",
       env: {
@@ -23,4 +24,3 @@ module.exports = {
     }
   ]
 };
-

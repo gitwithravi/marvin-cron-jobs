@@ -14,7 +14,7 @@ from marvin_core.db import (
     insert_team_status_task_observations,
     migrate,
 )
-from marvin_core import chat_server
+from marvin_core import marvin_api
 from tasks.team_status_today import run as task_run
 from tasks.team_status_today.analysis import (
     build_factual_payload,
@@ -488,7 +488,7 @@ def test_group_tasks_by_member_collects_per_member_lists():
 
 
 # ---------------------------------------------------------------------------
-# Chat server team status endpoint helpers
+# MARVIN API team status endpoint helpers
 # ---------------------------------------------------------------------------
 
 
@@ -537,9 +537,9 @@ class _FakeTeamStatusClient:
 def test_build_team_status_payload_fetches_live_members_and_tasks(monkeypatch):
     monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
     monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
-    monkeypatch.setattr(chat_server, "TeamStatusClient", _FakeTeamStatusClient)
+    monkeypatch.setattr(marvin_api, "TeamStatusClient", _FakeTeamStatusClient)
 
-    payload = chat_server.build_team_status_payload("2026-06-13")
+    payload = marvin_api.build_team_status_payload("2026-06-13")
 
     assert payload["date"] == "2026-06-13"
     assert payload["members"][0]["name"] == "Ada"
@@ -553,7 +553,7 @@ def test_build_team_status_payload_rejects_bad_date(monkeypatch):
     monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
     monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
     with pytest.raises(ValueError):
-        chat_server.build_team_status_payload("13-06-2026")
+        marvin_api.build_team_status_payload("13-06-2026")
 
 
 def test_build_team_status_payload_surfaces_client_errors(monkeypatch):
@@ -563,10 +563,10 @@ def test_build_team_status_payload_surfaces_client_errors(monkeypatch):
 
     monkeypatch.setenv("TEAM_STATUS_API_URL", "https://example.test/api")
     monkeypatch.setenv("TEAM_STATUS_API_KEY", "sk-live-team")
-    monkeypatch.setattr(chat_server, "TeamStatusClient", FailingClient)
+    monkeypatch.setattr(marvin_api, "TeamStatusClient", FailingClient)
 
     with pytest.raises(TeamStatusAPIError, match="upstream unavailable"):
-        chat_server.build_team_status_payload("2026-06-13")
+        marvin_api.build_team_status_payload("2026-06-13")
 
 
 # ---------------------------------------------------------------------------

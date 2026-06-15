@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { proxyToChatServer, requireApiSession } from "@/lib/marvin-server";
+import { proxyToMarvinApi, requireApiSession } from "@/lib/marvin-server";
 
 type Params = {
   params: Promise<{ runId: string }>;
@@ -11,5 +11,5 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { runId } = await params;
   const search = req.nextUrl.searchParams.toString();
   const path = search ? `/runs/${runId}/summary?${search}` : `/runs/${runId}/summary`;
-  return proxyToChatServer({ path, method: "POST" });
+  return proxyToMarvinApi({ path, method: "POST" });
 }

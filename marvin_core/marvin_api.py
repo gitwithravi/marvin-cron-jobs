@@ -42,7 +42,7 @@ from tasks.team_status_today.run import _require_real_env
 
 load_root_env()
 
-app = FastAPI(title="MARVIN Chat Server")
+app = FastAPI(title="MARVIN API")
 
 VALID_TEAM_STATUS_STATUSES = ("done", "in_progress", "blocked", "planned")
 
@@ -558,5 +558,5 @@ def generate_run_summary_endpoint(run_id: int, task_name: str | None = None):
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("CHAT_SERVER_PORT", "3031"))
-    uvicorn.run("marvin_core.chat_server:app", host="127.0.0.1", port=port, reload=False)
+    port = int(os.getenv("MARVIN_API_PORT", "3031"))
+    uvicorn.run("marvin_core.marvin_api:app", host="127.0.0.1", port=port, reload=False)

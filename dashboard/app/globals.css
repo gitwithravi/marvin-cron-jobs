@@ -337,6 +337,7 @@ pre {
 
 .metric {
   border-top: 3px solid var(--border-strong);
+  min-width: 0;
   padding: 20px;
 }
 
@@ -345,6 +346,7 @@ pre {
   font-size: 1.75rem;
   font-weight: 800;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .metric p {
@@ -352,6 +354,7 @@ pre {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.78rem;
   margin: 8px 0 0;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -794,6 +797,14 @@ pre {
   justify-content: space-between;
 }
 
+.beszel-system-header > div {
+  min-width: 0;
+}
+
+.beszel-system-card h2 {
+  overflow-wrap: anywhere;
+}
+
 .beszel-system-header p {
   color: var(--muted);
   margin: 6px 0 0;
@@ -841,10 +852,9 @@ pre {
 }
 
 .beszel-spark div {
-  align-items: baseline;
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
 
 .beszel-spark span,
@@ -859,7 +869,11 @@ pre {
 }
 
 .beszel-spark strong {
+  display: block;
   font-size: 1.05rem;
+  line-height: 1.15;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .beszel-spark svg {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatServerBaseUrl, requireApiSession } from "@/lib/marvin-server";
+import { marvinApiBaseUrl, requireApiSession } from "@/lib/marvin-server";
 
 export async function POST(req: NextRequest) {
   const unauthorized = await requireApiSession();
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch(`${chatServerBaseUrl()}/invoices/extract`, {
+    response = await fetch(`${marvinApiBaseUrl()}/invoices/extract`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      { error: "MARVIN chat server is unavailable." },
+      { error: "MARVIN API is unavailable." },
       { status: 503 }
     );
   }
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!response.ok) {
-    return NextResponse.json(data ?? { error: "Chat server error" }, { status: response.status });
+    return NextResponse.json(data ?? { error: "MARVIN API error" }, { status: response.status });
   }
   return NextResponse.json(data);
 }

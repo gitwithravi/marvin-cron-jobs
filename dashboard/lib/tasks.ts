@@ -2,7 +2,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import YAML from "yaml";
-import { chatServerBaseUrl } from "./marvin-server";
+import { marvinApiBaseUrl } from "./marvin-server";
 
 export type ReportSummary = {
   fileName: string; // mapped to run ID (string)
@@ -89,8 +89,8 @@ export async function getTasks(): Promise<TaskSummary[]> {
           }
           const taskName = config.task_name;
 
-          // Fetch runs from FastAPI
-          const url = `${chatServerBaseUrl()}/runs?task_name=${encodeURIComponent(taskName)}`;
+          // Fetch runs from the MARVIN API
+          const url = `${marvinApiBaseUrl()}/runs?task_name=${encodeURIComponent(taskName)}`;
           const res = await fetch(url, { cache: "no-store" });
           if (!res.ok) {
             return {
@@ -173,7 +173,7 @@ export async function getReportDetail(
   }
 
   try {
-    const url = `${chatServerBaseUrl()}/runs/${selectedReport.fileName}?task_name=${encodeURIComponent(taskName)}`;
+    const url = `${marvinApiBaseUrl()}/runs/${selectedReport.fileName}?task_name=${encodeURIComponent(taskName)}`;
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
       return {

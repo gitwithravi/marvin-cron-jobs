@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from marvin_core import chat_server
+from marvin_core import marvin_api
 from marvin_core.hermes import HermesClient, HermesClientError, HermesConfigError
 
 
@@ -112,12 +112,12 @@ def test_hermes_endpoint_returns_response(monkeypatch):
         assert history == [{"role": "user", "content": "hello"}]
         return "agent online"
 
-    monkeypatch.setattr(chat_server, "chat_with_hermes", fake_chat)
+    monkeypatch.setattr(marvin_api, "chat_with_hermes", fake_chat)
 
-    result = chat_server.hermes_chat_endpoint(
-        chat_server.HermesChatRequest(
+    result = marvin_api.hermes_chat_endpoint(
+        marvin_api.HermesChatRequest(
             message="status",
-            history=[chat_server.HermesHistoryMessage(role="user", content="hello")],
+            history=[marvin_api.HermesHistoryMessage(role="user", content="hello")],
         )
     )
 
@@ -128,10 +128,10 @@ def test_hermes_endpoint_maps_upstream_errors(monkeypatch):
     def fake_chat(_message, _history):
         raise HermesClientError("upstream unavailable")
 
-    monkeypatch.setattr(chat_server, "chat_with_hermes", fake_chat)
+    monkeypatch.setattr(marvin_api, "chat_with_hermes", fake_chat)
 
     with pytest.raises(HTTPException) as exc_info:
-        chat_server.hermes_chat_endpoint(chat_server.HermesChatRequest(message="status"))
+        marvin_api.hermes_chat_endpoint(marvin_api.HermesChatRequest(message="status"))
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "upstream unavailable"
