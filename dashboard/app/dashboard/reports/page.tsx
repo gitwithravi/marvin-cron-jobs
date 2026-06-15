@@ -2,6 +2,8 @@ import { TaskCard } from "@/components/TaskCard";
 import { marvinCopy } from "@/lib/marvin-copy";
 import { getTasks } from "@/lib/tasks";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const tasks = await getTasks();
 

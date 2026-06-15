@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from marvin_core.config import load_yaml
+from marvin_core.db import connect
 from marvin_core.env import load_root_env, require_env
 from marvin_core.paths import ROOT_DIR, project_path
 from marvin_core.soul import load_soul
@@ -287,21 +288,23 @@ def execute_task(task_name: str, params: dict[str, Any] | None = None) -> dict[s
 
 def read_report(task_name: str, params: dict[str, Any] | None = None) -> str:
     """
-    Reads the markdown report file for a task, resolving the latest report or a specific date.
+    Reads the latest DB-backed report for a task, falling back to legacy markdown files.
     """
     config_path = ROOT_DIR / "tasks" / task_name / "config.yaml"
     if not config_path.exists():
         raise FileNotFoundError(f"Task config not found for {task_name}")
 
     config = load_yaml(config_path)
+    date_str = params.get("date") if params else None
+
+    db_report = _read_db_report(task_name, config, date_str)
+    if db_report:
+        return db_report
+
     report_dir = project_path(config.get("report_dir", f"reports/{task_name}"))
 
     if not report_dir.exists():
         return f"No reports directory exists for task '{task_name}'."
-
-    date_str = None
-    if params:
-        date_str = params.get("date")
 
     if date_str:
         # Look for reports containing the date prefix (YYYY-MM-DD)
@@ -325,6 +328,65 @@ def read_report(task_name: str, params: dict[str, Any] | None = None) -> str:
         target_file = target_file.resolve()
 
     return target_file.read_text(encoding="utf-8")
+
+
+def _read_db_report(task_name: str, config: dict[str, Any], date_str: str | None) -> str | None:
+    database_path = config.get("database_path")
+    if not database_path:
+        return None
+
+    query = """
+        SELECT
+            tr.id,
+            tr.started_at,
+            tr.finished_at,
+            tr.status,
+            trp.observed_at,
+            trp.risk_level,
+            trp.deterministic_analysis_json,
+            trp.factual_json
+        FROM task_runs tr
+        JOIN task_run_payloads trp ON tr.id = trp.run_id
+        WHERE tr.task_name = ?
+    """
+    params: list[Any] = [task_name]
+    if date_str:
+        query += " AND substr(COALESCE(trp.observed_at, tr.started_at), 1, 10) = ?"
+        params.append(date_str)
+    query += " ORDER BY tr.id DESC LIMIT 1"
+
+    try:
+        with connect(database_path) as conn:
+            row = conn.execute(query, params).fetchone()
+    except Exception:
+        return None
+
+    if not row:
+        return None
+
+    analysis = json.loads(row["deterministic_analysis_json"])
+    factual_payload = json.loads(row["factual_json"])
+    title = task_name.replace("_", " ").title()
+    summary = str(analysis.get("summary", "")).strip() or "No deterministic summary available."
+    risk_level = str(analysis.get("risk_level") or row["risk_level"] or "unknown")
+    actions = analysis.get("recommended_actions") or []
+    facts = analysis.get("notable_facts") or []
+
+    lines = [
+        f"# {title} Run #{row['id']}",
+        "",
+        "## Summary",
+        "",
+        summary,
+        "",
+        "## Recommended Actions",
+        "",
+    ]
+    lines.extend([f"- {action}" for action in actions] or ["- No recommended actions returned."])
+    lines.extend(["", "## Risk Level", "", risk_level, "", "## Notable Facts", ""])
+    lines.extend([f"- {fact}" for fact in facts] or ["- No notable facts returned."])
+    lines.extend(["", "## Factual Data", "", "```json", json.dumps(factual_payload, indent=2, sort_keys=True, default=str), "```"])
+    return "\n".join(lines)
 
 
 def _extract_markdown_section(markdown: str, heading: str) -> str:

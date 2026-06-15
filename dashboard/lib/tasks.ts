@@ -1,13 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { promises as fs } from "fs";
 import path from "path";
 import YAML from "yaml";
+import { chatServerBaseUrl } from "./marvin-server";
 
 export type ReportSummary = {
-  fileName: string;
+  fileName: string; // mapped to run ID (string)
   label: string;
   href: string;
   modifiedAt: string;
   isLatest: boolean;
+  hasSummary?: boolean;
+  status?: string;
+  riskLevel?: string;
 };
 
 export type TaskSummary = {
@@ -23,7 +28,7 @@ export type TaskSummary = {
 export type ReportDetail = {
   task: TaskSummary;
   selectedReport: ReportSummary | null;
-  markdown: string | null;
+  run: any | null;
 };
 
 type TaskConfig = {
@@ -34,11 +39,6 @@ type TaskConfig = {
 const projectRoot = path.resolve(process.cwd(), "..");
 const tasksRoot = path.join(projectRoot, "tasks");
 
-function isInsideProject(filePath: string): boolean {
-  const relative = path.relative(projectRoot, filePath);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-}
-
 function titleize(value: string): string {
   return value
     .split(/[_-]+/)
@@ -47,29 +47,15 @@ function titleize(value: string): string {
     .join(" ");
 }
 
-function reportLabel(fileName: string): string {
-  if (fileName === "latest.md") {
-    return "Latest";
+function formatDateLabel(value: string): string {
+  try {
+    return new Intl.DateTimeFormat("en", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
+  } catch {
+    return value;
   }
-  return fileName.replace(/\.md$/i, "").replace(/_/g, " ");
-}
-
-function reportHref(taskName: string, fileName: string): string {
-  const base = `/dashboard/reports/${encodeURIComponent(taskName)}`;
-  if (fileName === "latest.md") {
-    return base;
-  }
-  return `${base}?report=${encodeURIComponent(fileName)}`;
-}
-
-function normalizeReportFileName(fileName: string): string | null {
-  if (!fileName.endsWith(".md")) {
-    return null;
-  }
-  if (fileName.includes("/") || fileName.includes("\\") || fileName.includes("..")) {
-    return null;
-  }
-  return fileName;
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
@@ -90,100 +76,71 @@ async function readTaskConfig(taskDir: string): Promise<TaskConfig | null> {
   return YAML.parse(raw) as TaskConfig;
 }
 
-async function listReports(taskName: string, reportDir: string): Promise<ReportSummary[]> {
-  const absoluteReportDir = path.resolve(projectRoot, reportDir);
-  if (!isInsideProject(absoluteReportDir) || !(await pathExists(absoluteReportDir))) {
-    return [];
-  }
-
-  const entries = await fs.readdir(absoluteReportDir, { withFileTypes: true });
-  const reports = await Promise.all(
-    entries
-      .filter((entry) => entry.isFile() || entry.isSymbolicLink())
-      .map(async (entry): Promise<ReportSummary | null> => {
-        const fileName = normalizeReportFileName(entry.name);
-        if (!fileName) {
-          return null;
-        }
-        const filePath = path.join(absoluteReportDir, fileName);
-        let stats;
-        try {
-          const realPath = await fs.realpath(filePath);
-          if (!isInsideProject(realPath)) {
+export async function getTasks(): Promise<TaskSummary[]> {
+  try {
+    const entries = await fs.readdir(tasksRoot, { withFileTypes: true });
+    const tasks = await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry): Promise<TaskSummary | null> => {
+          const config = await readTaskConfig(path.join(tasksRoot, entry.name));
+          if (!config?.task_name) {
             return null;
           }
-          stats = await fs.stat(realPath);
-        } catch {
-          return null;
-        }
-        return {
-          fileName,
-          label: reportLabel(fileName),
-          href: reportHref(taskName, fileName),
-          modifiedAt: stats.mtime.toISOString(),
-          isLatest: fileName === "latest.md"
-        };
-      })
-  );
+          const taskName = config.task_name;
 
-  return reports
-    .filter((report): report is ReportSummary => report !== null)
-    .sort((a, b) => {
-      if (a.isLatest) {
-        return -1;
-      }
-      if (b.isLatest) {
-        return 1;
-      }
-      return b.fileName.localeCompare(a.fileName);
-    });
-}
+          // Fetch runs from FastAPI
+          const url = `${chatServerBaseUrl()}/runs?task_name=${encodeURIComponent(taskName)}`;
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) {
+            return {
+              taskName: taskName,
+              displayName: titleize(taskName),
+              reportDir: config.report_dir || "",
+              reportCount: 0,
+              latestReport: null,
+              reports: [],
+              riskLevel: null
+            };
+          }
 
-async function readRiskLevel(reportDir: string): Promise<string | null> {
-  const latestPath = path.resolve(projectRoot, reportDir, "latest.md");
-  if (!isInsideProject(latestPath) || !(await pathExists(latestPath))) {
-    return null;
+          const runs = (await res.json()) as any[];
+          const reports: ReportSummary[] = runs.map((run: any, index: number) => {
+            const timeVal = run.observed_at || run.started_at;
+            return {
+              fileName: String(run.id),
+              label: formatDateLabel(timeVal),
+              href: `/dashboard/reports/${encodeURIComponent(taskName)}?report=${run.id}`,
+              modifiedAt: timeVal,
+              isLatest: index === 0,
+              hasSummary: !!run.has_summary,
+              status: run.status,
+              riskLevel: run.risk_level
+            };
+          });
+
+          const latestReport = reports[0] || null;
+          const riskLevel = latestReport ? latestReport.riskLevel || null : null;
+
+          return {
+            taskName: taskName,
+            displayName: titleize(taskName),
+            reportDir: config.report_dir || "",
+            reportCount: reports.length,
+            latestReport,
+            reports,
+            riskLevel
+          };
+        })
+    );
+
+    return tasks
+      .filter((task): task is TaskSummary => task !== null)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  } catch (err) {
+    console.error("Error in getTasks:", err);
+    return [];
   }
-  const realPath = await fs.realpath(latestPath);
-  if (!isInsideProject(realPath)) {
-    return null;
-  }
-  const markdown = await fs.readFile(latestPath, "utf8");
-  const match = markdown.match(/## Risk Level\s+([a-zA-Z]+)/);
-  return match?.[1]?.toLowerCase() ?? null;
-}
-
-export async function getTasks(): Promise<TaskSummary[]> {
-  const entries = await fs.readdir(tasksRoot, { withFileTypes: true });
-  const tasks = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory())
-      .map(async (entry): Promise<TaskSummary | null> => {
-        const config = await readTaskConfig(path.join(tasksRoot, entry.name));
-        if (!config?.task_name || !config.report_dir) {
-          return null;
-        }
-        const reports = await listReports(config.task_name, config.report_dir);
-        const latestReport =
-          reports.find((report) => report.isLatest) ??
-          reports.find((report) => report.fileName !== "latest.md") ??
-          null;
-
-        return {
-          taskName: config.task_name,
-          displayName: titleize(config.task_name),
-          reportDir: config.report_dir,
-          reportCount: reports.filter((report) => !report.isLatest).length,
-          latestReport,
-          reports,
-          riskLevel: await readRiskLevel(config.report_dir)
-        };
-      })
-  );
-
-  return tasks
-    .filter((task): task is TaskSummary => task !== null)
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 export async function getTask(taskName: string): Promise<TaskSummary | null> {
@@ -200,47 +157,43 @@ export async function getReportDetail(
     return null;
   }
 
-  const selectedFileName = requestedReport
-    ? normalizeReportFileName(requestedReport)
-    : "latest.md";
-  if (!selectedFileName) {
-    return {
-      task,
-      selectedReport: null,
-      markdown: null
-    };
+  let selectedReport: ReportSummary | null = null;
+  if (requestedReport) {
+    selectedReport = task.reports.find((r) => r.fileName === requestedReport) || null;
+  } else {
+    selectedReport = task.latestReport;
   }
 
-  const selectedReport =
-    task.reports.find((report) => report.fileName === selectedFileName) ?? null;
   if (!selectedReport) {
     return {
       task,
       selectedReport: null,
-      markdown: null
+      run: null
     };
   }
 
-  const reportPath = path.resolve(projectRoot, task.reportDir, selectedReport.fileName);
-  if (!isInsideProject(reportPath)) {
+  try {
+    const url = `${chatServerBaseUrl()}/runs/${selectedReport.fileName}?task_name=${encodeURIComponent(taskName)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      return {
+        task,
+        selectedReport,
+        run: null
+      };
+    }
+    const run = await res.json();
     return {
       task,
-      selectedReport: null,
-      markdown: null
+      selectedReport,
+      run
     };
-  }
-  const realPath = await fs.realpath(reportPath);
-  if (!isInsideProject(realPath)) {
+  } catch (err) {
+    console.error("Error in getReportDetail:", err);
     return {
       task,
-      selectedReport: null,
-      markdown: null
+      selectedReport,
+      run: null
     };
   }
-
-  return {
-    task,
-    selectedReport,
-    markdown: await fs.readFile(realPath, "utf8")
-  };
 }

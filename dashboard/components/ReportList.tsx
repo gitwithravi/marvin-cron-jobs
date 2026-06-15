@@ -16,6 +16,7 @@ export function ReportList({
   reports: ReportSummary[];
   selectedFileName: string | null;
 }) {
+  const latestReport = reports.find((report) => report.isLatest) ?? null;
   const historicalReports = reports.filter((report) => !report.isLatest);
 
   if (reports.length === 0) {
@@ -24,15 +25,15 @@ export function ReportList({
 
   return (
     <nav className="report-list" aria-label="Task reports">
-      {reports.find((report) => report.isLatest) ? (
+      {latestReport ? (
         <Link
           className={
-            selectedFileName === "latest.md" ? "report-link active" : "report-link"
+            selectedFileName === latestReport.fileName ? "report-link active" : "report-link"
           }
-          href={reports.find((report) => report.isLatest)?.href ?? "#"}
+          href={latestReport.href}
         >
           <span>Latest</span>
-          <small>Symlink</small>
+          <small>{formatDate(latestReport.modifiedAt)}</small>
         </Link>
       ) : null}
       {historicalReports.map((report) => (

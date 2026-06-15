@@ -11,6 +11,11 @@ import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 from requests import RequestException
+import importlib
+import json
+from marvin_core.db import connect, insert_marvin_summary
+from marvin_core.communication_style import load_communication_style
+from marvin_core.openrouter import OpenRouterClient
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
@@ -19,7 +24,8 @@ if str(ROOT_DIR) not in sys.path:
 from marvin_core.agent import process_message, execute_task, read_report, format_response
 from marvin_core.alerts import generate_alert, read_latest_alert
 from marvin_core.beszel_live import fetch_beszel_live_payload
-from marvin_core.env import load_root_env
+from marvin_core.env import load_root_env, require_env
+from marvin_core.config import load_yaml
 from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
 from marvin_core.invoices import create_invoice_draft, list_invoices, save_invoice
 from marvin_core.todos import (
@@ -105,6 +111,16 @@ class InvoiceSaveRequest(BaseModel):
 class InvoiceExtractRequest(BaseModel):
     filename: str
     pdf_base64: str
+
+
+def _database_path_for_task(task_name: str | None = None) -> str:
+    if task_name:
+        config_path = ROOT_DIR / "tasks" / task_name / "config.yaml"
+        if config_path.exists():
+            config = load_yaml(config_path)
+            if config.get("database_path"):
+                return str(config["database_path"])
+    return os.getenv("MARVIN_DATABASE_PATH", "data/marvin.sqlite3")
 
 
 def build_team_status_payload(date: str) -> dict[str, Any]:
@@ -363,6 +379,182 @@ def refresh_alert_endpoint(background_tasks: BackgroundTasks):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/runs")
+def get_runs_endpoint(task_name: str | None = None):
+    try:
+        with connect(_database_path_for_task(task_name)) as conn:
+            query = """
+                SELECT
+                    tr.id,
+                    tr.task_name,
+                    tr.started_at,
+                    tr.finished_at,
+                    tr.status,
+                    tr.error,
+                    trp.observed_at,
+                    trp.risk_level,
+                    EXISTS (
+                        SELECT 1 FROM marvin_summaries ms WHERE ms.run_id = tr.id
+                    ) as has_summary
+                FROM task_runs tr
+                JOIN task_run_payloads trp ON tr.id = trp.run_id
+            """
+            params = []
+            if task_name:
+                query += " WHERE tr.task_name = ?"
+                params.append(task_name)
+            query += " ORDER BY tr.id DESC"
+
+            rows = conn.execute(query, params).fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/runs/{run_id}")
+def get_run_endpoint(run_id: int, task_name: str | None = None):
+    try:
+        with connect(_database_path_for_task(task_name)) as conn:
+            # Get the basic run info
+            run_row = conn.execute(
+                "SELECT id, task_name, started_at, finished_at, status, error FROM task_runs WHERE id = ?",
+                (run_id,)
+            ).fetchone()
+            if not run_row:
+                raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+            run_dict = dict(run_row)
+
+            # Get payload
+            payload_row = conn.execute(
+                "SELECT observed_at, risk_level, factual_json, deterministic_analysis_json FROM task_run_payloads WHERE run_id = ?",
+                (run_id,)
+            ).fetchone()
+
+            if payload_row:
+                run_dict["observed_at"] = payload_row["observed_at"]
+                run_dict["risk_level"] = payload_row["risk_level"]
+                run_dict["factual_payload"] = json.loads(payload_row["factual_json"])
+                run_dict["deterministic_analysis"] = json.loads(payload_row["deterministic_analysis_json"])
+            else:
+                run_dict["observed_at"] = None
+                run_dict["risk_level"] = None
+                run_dict["factual_payload"] = None
+                run_dict["deterministic_analysis"] = None
+
+            # Get cached summary
+            summary_row = conn.execute(
+                "SELECT model, summary_json, created_at FROM marvin_summaries WHERE run_id = ? LIMIT 1",
+                (run_id,)
+            ).fetchone()
+
+            if summary_row:
+                run_dict["summary"] = {
+                    "model": summary_row["model"],
+                    "summary_json": json.loads(summary_row["summary_json"]),
+                    "created_at": summary_row["created_at"]
+                }
+            else:
+                run_dict["summary"] = None
+
+            return run_dict
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/runs/{run_id}/summary")
+def generate_run_summary_endpoint(run_id: int, task_name: str | None = None):
+    try:
+        with connect(_database_path_for_task(task_name)) as conn:
+            # 1. Fetch task run
+            run_row = conn.execute(
+                "SELECT task_name FROM task_runs WHERE id = ?",
+                (run_id,)
+            ).fetchone()
+            if not run_row:
+                raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+            task_name = run_row["task_name"]
+
+            # 2. Load config for this task to get model and prompts directory
+            task_dir = ROOT_DIR / "tasks" / task_name
+            config_path = task_dir / "config.yaml"
+            if not config_path.exists():
+                raise HTTPException(status_code=404, detail=f"Task config for {task_name} not found")
+
+            config = load_yaml(config_path)
+            model = config.get("model", "deepseek/deepseek-v4-flash")
+
+            # 3. Check if cached summary already exists for this run and model
+            cached_row = conn.execute(
+                "SELECT summary_json FROM marvin_summaries WHERE run_id = ? AND model = ?",
+                (run_id, model)
+            ).fetchone()
+            if cached_row:
+                return json.loads(cached_row["summary_json"])
+
+            # 4. Fetch payload
+            payload_row = conn.execute(
+                "SELECT factual_json FROM task_run_payloads WHERE run_id = ?",
+                (run_id,)
+            ).fetchone()
+            if not payload_row:
+                raise HTTPException(status_code=400, detail="Task run payload not found, cannot summarize")
+
+            factual_payload = json.loads(payload_row["factual_json"])
+
+            # 5. Build prompt
+            communication_style = load_communication_style()
+
+            # Dynamically import build_messages
+            try:
+                analysis_module = importlib.import_module(f"tasks.{task_name}.analysis")
+                build_messages = getattr(analysis_module, "build_messages")
+            except (ImportError, AttributeError):
+                raise HTTPException(status_code=500, detail=f"Failed to import build_messages for task {task_name}")
+
+            messages = build_messages(
+                prompts_dir=task_dir / "prompts",
+                communication_style=communication_style,
+                factual_payload=factual_payload,
+            )
+
+            # 6. Call OpenRouter
+            api_key = os.getenv("OPENROUTER_API_KEY") or require_env("OPENROUTER_API_KEY")
+            openrouter = OpenRouterClient(api_key)
+            llm_config = config.get("openrouter") or {}
+
+            analysis = openrouter.chat_json(
+                model=model,
+                messages=messages,
+                temperature=float(llm_config.get("temperature", 0.2)),
+                max_tokens=int(llm_config.get("max_tokens", 1200)),
+            )
+
+            # Ensure risk level is present
+            if "risk_level" not in analysis:
+                # Get risk level from DB
+                risk_row = conn.execute(
+                    "SELECT risk_level FROM task_run_payloads WHERE run_id = ?",
+                    (run_id,)
+                ).fetchone()
+                analysis["risk_level"] = risk_row["risk_level"] if risk_row else "low"
+
+            # 7. Store in marvin_summaries
+            from datetime import datetime, timezone
+            created_at = datetime.now(timezone.utc).isoformat()
+            insert_marvin_summary(conn, run_id, model, analysis, created_at)
+
+            return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 if __name__ == "__main__":

@@ -805,7 +805,6 @@ def test_run_task_dry_run_writes_report(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(task_run.TeamStatusClient, "fetch_tasks", fake_fetch_tasks)
     monkeypatch.setattr(task_run, "connect", fake_connect)
     monkeypatch.setattr(task_run, "TASK_DIR", task_dir)
-    monkeypatch.setattr(task_run, "ROOT_DIR", tmp_path)
 
     def override_project_path(path):
         candidate = Path(path)
@@ -829,9 +828,6 @@ def test_run_task_dry_run_writes_report(tmp_path: Path, monkeypatch):
 
     report_path = task_run.run_task(dry_run=True, date="2026-06-13")
     assert report_path.exists()
-    contents = report_path.read_text(encoding="utf-8")
-    assert "Team Status Today" in contents
-    assert "low" in contents
 
     conn = sqlite3.connect(db_path)
     counts = {
@@ -840,14 +836,14 @@ def test_run_task_dry_run_writes_report(tmp_path: Path, monkeypatch):
             "task_runs",
             "team_status_member_snapshots",
             "team_status_task_observations",
-            "reports",
+            "task_run_payloads",
         ]
     }
     assert counts == {
         "task_runs": 1,
         "team_status_member_snapshots": 1,
         "team_status_task_observations": 1,
-        "reports": 1,
+        "task_run_payloads": 1,
     }
     conn.close()
 

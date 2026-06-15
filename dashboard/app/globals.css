@@ -1110,6 +1110,13 @@ pre {
   min-width: 0;
 }
 
+.report-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
 .report-toolbar {
   align-items: center;
   background: var(--surface);
@@ -1120,6 +1127,26 @@ pre {
   justify-content: space-between;
   margin-bottom: 16px;
   padding: 16px;
+}
+
+.analysis-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.analysis-section h3 {
+  margin: 0;
+}
+
+.analysis-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.analysis-card .summary-text {
+  margin: 0;
 }
 
 .report-toolbar h2 {

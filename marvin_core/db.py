@@ -211,6 +211,37 @@ CREATE INDEX IF NOT EXISTS idx_reimbursement_invoices_invoice_date
 
 CREATE INDEX IF NOT EXISTS idx_reimbursement_invoices_identity
     ON reimbursement_invoices(invoice_no, invoice_from);
+
+CREATE TABLE IF NOT EXISTS task_run_payloads (
+    run_id INTEGER PRIMARY KEY,
+    task_name TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    risk_level TEXT NOT NULL,
+    factual_json TEXT NOT NULL,
+    deterministic_analysis_json TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES task_runs(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS marvin_summaries (
+    run_id INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    summary_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (run_id, model),
+    FOREIGN KEY (run_id) REFERENCES task_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_run_payloads_task_name_observed
+    ON task_run_payloads(task_name, observed_at);
+
+CREATE INDEX IF NOT EXISTS idx_task_run_payloads_risk_level
+    ON task_run_payloads(risk_level);
+
+CREATE INDEX IF NOT EXISTS idx_task_runs_task_name
+    ON task_runs(task_name);
+
+CREATE INDEX IF NOT EXISTS idx_task_runs_status
+    ON task_runs(status);
 """
 
 
@@ -578,5 +609,55 @@ def insert_vityarthi_support_ticket_observations(
             )
             for ticket in open_tickets
         ],
+    )
+    conn.commit()
+
+
+def insert_task_run_payload(
+    conn: sqlite3.Connection,
+    run_id: int,
+    task_name: str,
+    observed_at: str,
+    risk_level: str,
+    factual_payload: dict[str, Any],
+    deterministic_analysis: dict[str, Any],
+) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO task_run_payloads
+            (run_id, task_name, observed_at, risk_level, factual_json, deterministic_analysis_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            task_name,
+            observed_at,
+            risk_level,
+            json.dumps(factual_payload, sort_keys=True, default=str),
+            json.dumps(deterministic_analysis, sort_keys=True, default=str),
+        ),
+    )
+    conn.commit()
+
+
+def insert_marvin_summary(
+    conn: sqlite3.Connection,
+    run_id: int,
+    model: str,
+    summary_json: dict[str, Any],
+    created_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO marvin_summaries
+            (run_id, model, summary_json, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            model,
+            json.dumps(summary_json, sort_keys=True, default=str),
+            created_at,
+        ),
     )
     conn.commit()

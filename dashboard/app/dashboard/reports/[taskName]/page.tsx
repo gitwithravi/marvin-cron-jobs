@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MarkdownViewer } from "@/components/MarkdownViewer";
 import { ReportList } from "@/components/ReportList";
-import { marvinCopy } from "@/lib/marvin-copy";
+import { ReportDetailView } from "@/components/ReportDetailView";
 import { getReportDetail } from "@/lib/tasks";
+
+export const dynamic = "force-dynamic";
 
 type TaskReportPageProps = {
   params: Promise<{ taskName: string }>;
@@ -39,28 +40,12 @@ export default async function TaskReportPage({
         />
       </aside>
       <section className="report-content">
-        {detail.markdown && detail.selectedReport ? (
-          <>
-            <header className="report-toolbar">
-              <div>
-                <p className="eyebrow">Report</p>
-                <h2>{detail.selectedReport.fileName}</h2>
-              </div>
-              <button
-                className="button"
-                type="button"
-                disabled
-                title={marvinCopy.disabledRunTaskTitle}
-              >
-                {marvinCopy.disabledRunTask}
-              </button>
-            </header>
-            <MarkdownViewer markdown={detail.markdown} />
-          </>
+        {detail.run && detail.selectedReport ? (
+          <ReportDetailView run={detail.run} />
         ) : (
           <section className="empty-state">
-            <h2>Report not found</h2>
-            <p className="muted">{marvinCopy.reportNotFound}</p>
+            <h2>No runs found</h2>
+            <p className="muted">This task has not recorded any execution runs yet.</p>
           </section>
         )}
       </section>

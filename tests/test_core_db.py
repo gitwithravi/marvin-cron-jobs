@@ -10,6 +10,8 @@ from marvin_core.db import (
     insert_monitor_snapshots,
     insert_report,
     migrate,
+    insert_task_run_payload,
+    insert_marvin_summary,
 )
 
 
@@ -99,3 +101,57 @@ def test_beszel_db_inserts(tmp_path):
 
     conn.close()
 
+
+def test_payload_and_summary_inserts(tmp_path):
+    conn = connect(tmp_path / "marvin.sqlite3")
+    migrate(conn)
+
+    run_id = create_task_run(conn, "uptime_kuma_heartbeat", "2026-06-13T00:00:00+00:00")
+
+    # Test task_run_payload insert and read
+    factual = {"test": 123}
+    det_analysis = {"risk": "low", "summary": "everything ok"}
+    insert_task_run_payload(
+        conn,
+        run_id,
+        "uptime_kuma_heartbeat",
+        "2026-06-13T00:00:00+00:00",
+        "low",
+        factual,
+        det_analysis,
+    )
+
+    row = conn.execute("SELECT * FROM task_run_payloads WHERE run_id = ?", (run_id,)).fetchone()
+    assert row is not None
+    import json
+    assert json.loads(row["factual_json"]) == factual
+    assert json.loads(row["deterministic_analysis_json"]) == det_analysis
+    assert row["risk_level"] == "low"
+
+    # Test marvin_summaries insert and read
+    summary = {"summary": "Marvin says all ok"}
+    insert_marvin_summary(
+        conn,
+        run_id,
+        "deepseek/deepseek-v4-flash",
+        summary,
+        "2026-06-13T00:01:00+00:00",
+    )
+
+    row = conn.execute("SELECT * FROM marvin_summaries WHERE run_id = ? AND model = ?", (run_id, "deepseek/deepseek-v4-flash")).fetchone()
+    assert row is not None
+    assert json.loads(row["summary_json"]) == summary
+
+    # Verify duplicate insert updates the cache (idempotent/overwrite)
+    new_summary = {"summary": "Marvin says updated"}
+    insert_marvin_summary(
+        conn,
+        run_id,
+        "deepseek/deepseek-v4-flash",
+        new_summary,
+        "2026-06-13T00:02:00+00:00",
+    )
+    row = conn.execute("SELECT * FROM marvin_summaries WHERE run_id = ? AND model = ?", (run_id, "deepseek/deepseek-v4-flash")).fetchone()
+    assert json.loads(row["summary_json"]) == new_summary
+
+    conn.close()
