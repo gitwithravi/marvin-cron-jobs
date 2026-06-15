@@ -43,6 +43,7 @@ export function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState(marvinCopy.chatThinking);
   const [hasUnread, setHasUnread] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatWindowRef = useRef<HTMLDivElement>(null);
@@ -50,6 +51,20 @@ export function ChatWidget() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  const formatMessageTime = (timestamp: Date) => {
+    if (!hasMounted) {
+      return "--:--";
+    }
+    return timestamp.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   useEffect(() => {
@@ -384,10 +399,7 @@ export function ChatWidget() {
                 )}
               </div>
               <span className="marvin-chat-message-time">
-                {msg.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {formatMessageTime(msg.timestamp)}
               </span>
             </div>
           ))}
