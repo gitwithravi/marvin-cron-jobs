@@ -9,6 +9,7 @@ MARVIN is a script-first operations agent with a private web dashboard. Tasks ru
 - **Task orchestration chat**: MARVIN chat classifies dashboard requests, reads reports, and asks for confirmation before executing tasks.
 - **Hermes chat mode**: Separate dashboard chat mode for an OpenAI-compatible Hermes agent endpoint.
 - **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and chat server.
+- **Invoice reimbursement tracker**: Upload invoice PDFs, extract reimbursement fields with OpenRouter, confirm them, store records in SQLite, and archive PDFs locally.
 - **Team status board**: Fetches member task status for a selected date and shows per-member summaries.
 - **OpenRouter usage panel**: Displays account credits and usage from the OpenRouter management API.
 - **Alerts**: Generates and serves latest operational alerts.
@@ -71,6 +72,8 @@ OPENROUTER_MANAGEMENT_KEY=sk-or-v1-your-management-key
 MARVIN_CHAT_MODEL=google/gemini-2.5-flash
 TODO_CLASSIFIER_MODEL=google/gemini-2.5-flash
 TODO_REMINDER_MODEL=google/gemini-2.5-flash
+INVOICE_EXTRACTOR_MODEL=google/gemini-2.5-flash
+INVOICE_PDF_ENGINE=cloudflare-ai
 
 UPTIME_KUMA_URL=http://localhost:3001
 UPTIME_KUMA_USERNAME=admin
@@ -97,6 +100,8 @@ HERMES_TIMEOUT_SECONDS=60
 ```
 
 `HERMES_BASE_URL` must point to an OpenAI-compatible base URL. MARVIN calls `${HERMES_BASE_URL}/chat/completions`.
+
+For invoice uploads, confirmed PDFs are archived under `data/invoices/`. `INVOICE_PDF_ENGINE=cloudflare-ai` is free and works for normal PDFs; use `mistral-ocr` for scanned invoices if needed.
 
 ### 4. Configure dashboard environment
 

@@ -189,6 +189,28 @@ CREATE TABLE IF NOT EXISTS vityarthi_ticket_count_snapshots (
     total_count INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (run_id) REFERENCES task_runs(id)
 );
+
+CREATE TABLE IF NOT EXISTS reimbursement_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_no TEXT,
+    invoice_date TEXT NOT NULL,
+    invoice_from TEXT NOT NULL,
+    amount_usd REAL,
+    amount_inr REAL,
+    original_filename TEXT NOT NULL,
+    invoice_file_path TEXT NOT NULL,
+    invoice_file_url TEXT,
+    extraction_model TEXT,
+    extraction_raw_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reimbursement_invoices_invoice_date
+    ON reimbursement_invoices(invoice_date);
+
+CREATE INDEX IF NOT EXISTS idx_reimbursement_invoices_identity
+    ON reimbursement_invoices(invoice_no, invoice_from);
 """
 
 
@@ -237,6 +259,8 @@ MIGRATIONS = [
     ("beszel_alert_observations_alert_name", "ALTER TABLE beszel_alert_observations ADD COLUMN alert_name TEXT"),
     ("beszel_alert_observations_triggered", "ALTER TABLE beszel_alert_observations ADD COLUMN triggered INTEGER"),
     ("beszel_alert_observations_min_value", "ALTER TABLE beszel_alert_observations ADD COLUMN min_value TEXT"),
+    ("reimbursement_invoices_invoice_file_path", "ALTER TABLE reimbursement_invoices ADD COLUMN invoice_file_path TEXT"),
+    ("reimbursement_invoices_invoice_file_url", "ALTER TABLE reimbursement_invoices ADD COLUMN invoice_file_url TEXT"),
 ]
 
 
@@ -252,6 +276,26 @@ def run_migrations(conn: sqlite3.Connection) -> None:
             except sqlite3.OperationalError:
                 pass
             conn.execute("INSERT INTO _migrations (name) VALUES (?)", (name,))
+    columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(reimbursement_invoices)").fetchall()
+    }
+    if {"invoice_file_path", "google_drive_file_id"}.issubset(columns):
+        conn.execute(
+            """
+            UPDATE reimbursement_invoices
+            SET invoice_file_path = COALESCE(invoice_file_path, google_drive_file_id)
+            WHERE invoice_file_path IS NULL
+            """
+        )
+    if {"invoice_file_url", "google_drive_web_link"}.issubset(columns):
+        conn.execute(
+            """
+            UPDATE reimbursement_invoices
+            SET invoice_file_url = COALESCE(invoice_file_url, google_drive_web_link)
+            WHERE invoice_file_url IS NULL
+            """
+        )
     conn.commit()
 
 

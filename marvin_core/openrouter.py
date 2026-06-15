@@ -15,10 +15,31 @@ class OpenRouterClient:
         self,
         *,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         temperature: float = 0.2,
         max_tokens: int = 1200,
+        response_schema: dict[str, Any] | None = None,
+        plugins: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        response_format: dict[str, Any]
+        if response_schema is None:
+            response_format = {"type": "json_object"}
+        else:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": response_schema,
+            }
+
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "response_format": response_format,
+        }
+        if plugins:
+            payload["plugins"] = plugins
+
         response = requests.post(
             OPENROUTER_CHAT_URL,
             headers={
@@ -26,13 +47,7 @@ class OpenRouterClient:
                 "Content-Type": "application/json",
                 "X-OpenRouter-Title": "MARVIN Agent",
             },
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "response_format": {"type": "json_object"},
-            },
+            json=payload,
             timeout=self.timeout_seconds,
         )
         response.raise_for_status()
@@ -47,4 +62,3 @@ class OpenRouterClient:
         if not isinstance(parsed, dict):
             raise ValueError("OpenRouter response content was not a JSON object")
         return parsed
-

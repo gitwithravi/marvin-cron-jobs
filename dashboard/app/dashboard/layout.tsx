@@ -24,6 +24,7 @@ export default async function DashboardLayout({
           <Link href="/dashboard/team-status">Team Status</Link>
           <Link href="/dashboard/reports">Reports</Link>
           <Link href="/dashboard/todos">Todos</Link>
+          <Link href="/dashboard/invoices">Invoices</Link>
         </nav>
         <div className="sidebar-footer">
           <p>{session.username}</p>

@@ -541,6 +541,210 @@ pre {
   margin: 8px 0 0;
 }
 
+.invoice-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.invoice-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.invoice-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.invoice-panel h2 {
+  margin: 0;
+}
+
+.invoice-upload,
+.invoice-confirm-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.invoice-upload label,
+.invoice-confirm-grid label,
+.invoice-month {
+  color: #2f3d40;
+  display: grid;
+  font-size: 0.92rem;
+  font-weight: 650;
+  gap: 8px;
+}
+
+.invoice-upload input,
+.invoice-confirm-grid input,
+.invoice-month input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.invoice-upload input:focus,
+.invoice-confirm-grid input:focus,
+.invoice-month input:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgba(71, 127, 104, 0.18);
+}
+
+.invoice-confirm-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.invoice-confirm-grid label:nth-child(3),
+.invoice-check,
+.invoice-actions {
+  grid-column: 1 / -1;
+}
+
+.invoice-check {
+  align-items: center;
+  background: #f3ead9;
+  border: 1px solid #d9c39d;
+  border-radius: 6px;
+  color: var(--warning);
+  display: flex !important;
+  gap: 10px !important;
+  padding: 10px 12px;
+}
+
+.invoice-check input {
+  min-height: auto;
+}
+
+.invoice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.invoice-chip {
+  background: #e9f0ef;
+  border: 1px solid #b7c8c4;
+  border-radius: 999px;
+  color: var(--accent-dark);
+  flex: 0 0 auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.invoice-warning {
+  background: #f3ead9;
+  border: 1px solid #d9c39d;
+  border-radius: 6px;
+  color: var(--warning);
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.invoice-warning p {
+  margin: 0;
+}
+
+.invoice-month {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+.invoice-month span {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.invoice-total-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.invoice-total-grid div {
+  background: #f1f5f3;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.invoice-total-grid span {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.invoice-total-grid p {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+  margin: 8px 0 0;
+  text-transform: uppercase;
+}
+
+.invoice-table-wrap {
+  overflow-x: auto;
+}
+
+.invoice-table {
+  border-collapse: collapse;
+  min-width: 760px;
+  width: 100%;
+}
+
+.invoice-table th,
+.invoice-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 11px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.invoice-table th {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.invoice-table td {
+  overflow-wrap: anywhere;
+}
+
+.invoice-table a {
+  color: var(--accent-dark);
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.invoice-empty {
+  background: #f1f5f3;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 16px;
+}
+
 .beszel-stack {
   display: grid;
   gap: 18px;
@@ -2168,6 +2372,17 @@ label {
 
   .team-status-toolbar {
     align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-panel-header,
+  .invoice-month {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .invoice-confirm-grid,
+  .invoice-total-grid {
     grid-template-columns: 1fr;
   }
 }

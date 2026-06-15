@@ -1,10 +1,13 @@
+import binascii
 import os
 import sys
 from pathlib import Path
 from typing import Any, Literal
 from collections import Counter
 
+import base64
 import uvicorn
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 from requests import RequestException
@@ -18,6 +21,7 @@ from marvin_core.alerts import generate_alert, read_latest_alert
 from marvin_core.beszel_live import fetch_beszel_live_payload
 from marvin_core.env import load_root_env
 from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
+from marvin_core.invoices import create_invoice_draft, list_invoices, save_invoice
 from marvin_core.todos import (
     classify_and_apply_tags,
     create_tag,
@@ -83,6 +87,24 @@ class TodoRetagRequest(BaseModel):
 class TagCreateRequest(BaseModel):
     name: str
     description: str | None = None
+
+
+class InvoiceSaveRequest(BaseModel):
+    draft_id: str
+    invoice_no: str | None = None
+    invoice_date: str
+    invoice_from: str
+    amount_usd: float | None = None
+    amount_inr: float | None = None
+    original_filename: str
+    extraction_model: str | None = None
+    extraction_raw_json: dict[str, Any] | None = None
+    usd_only_confirmed: bool | None = None
+
+
+class InvoiceExtractRequest(BaseModel):
+    filename: str
+    pdf_base64: str
 
 
 def build_team_status_payload(date: str) -> dict[str, Any]:
@@ -206,6 +228,45 @@ def todos_endpoint(status: str | None = None, tag_id: int | None = None, include
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/invoices")
+def invoices_endpoint(month: str | None = None):
+    try:
+        return list_invoices(month)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/invoices/extract")
+def extract_invoice_endpoint(payload: InvoiceExtractRequest):
+    try:
+        pdf_bytes = base64.b64decode(payload.pdf_base64, validate=True)
+        return {"draft": create_invoice_draft(pdf_bytes, payload.filename)}
+    except binascii.Error:
+        raise HTTPException(status_code=400, detail="Invalid invoice PDF payload.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.post("/invoices")
+def create_invoice_endpoint(payload: InvoiceSaveRequest):
+    try:
+        return {"invoice": save_invoice(payload.model_dump())}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @app.get("/team-status")
