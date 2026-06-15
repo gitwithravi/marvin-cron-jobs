@@ -9,8 +9,11 @@ export const marvinCopy = {
   authConfigError:
     "MARVIN cannot authenticate anyone because configuration is missing. Predictable.",
   authInvalidError: "Invalid username or password. A familiar human limitation.",
-  disabledRunTask: "Run task now",
-  disabledRunTaskTitle: "Manual task execution is not wired yet. MARVIN noticed.",
+  runTask: "Run task now",
+  runTaskTitle: "Execute this task immediately",
+  runTaskRunning: "Running...",
+  runTaskSuccess: "Task started",
+  runTaskError: "Run failed",
   noTaskReports: "No Markdown reports exist for this task yet. Silence, but formatted.",
   reportNotFound:
     "Select an available Markdown report from the task report list. Guessing is discouraged.",
