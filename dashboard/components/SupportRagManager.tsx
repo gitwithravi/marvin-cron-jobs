@@ -102,7 +102,7 @@ export function SupportRagManager() {
     setIsLoading(true);
     setError(null);
     try {
-      const data: TicketsPayload = await fetch("/api/support-rag/tickets?statuses=open,replied&limit=25").then(readJson);
+      const data: TicketsPayload = await fetch("/api/support-rag/tickets?statuses=open&limit=25").then(readJson);
       setTickets(data.tickets || []);
       const initialDrafts: Record<number, Suggestion> = {};
       const initialEdits: Record<number, string> = {};
