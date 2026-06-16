@@ -98,7 +98,6 @@ class SupportRagExample:
                 f"Subject: {self.subject}",
                 f"Category: {self.category}",
                 f"Customer issue: {self.customer_message}",
-                f"Support reply: {self.staff_reply}",
             )
             if part
         )
@@ -381,24 +380,44 @@ class QdrantSupportStore:
         return len(points)
 
     def search(self, query: str, *, limit: int = 5, category: str | None = None) -> list[RetrievalMatch]:
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
         vector = self.embedding_provider.embed([query])[0]
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=vector,
-            limit=limit * 3 if category else limit,
-            with_payload=True,
-        )
         matches: list[RetrievalMatch] = []
-        for result in results:
-            payload = result.payload or {}
-            if category and payload.get("category") != category and len(matches) >= limit:
-                continue
-            score = float(result.score)
-            if category and payload.get("category") == category:
-                score += 0.05
-            matches.append(_payload_to_match(payload, score))
-            if len(matches) >= limit:
-                break
+
+        if category and category != "unknown":
+            cat_filter = Filter(
+                must=[FieldCondition(key="category", match=MatchValue(value=category))]
+            )
+            cat_results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=vector,
+                limit=limit,
+                query_filter=cat_filter,
+                with_payload=True,
+            )
+            for result in cat_results:
+                payload = result.payload or {}
+                matches.append(_payload_to_match(payload, float(result.score)))
+
+        if len(matches) < limit:
+            remaining = limit - len(matches)
+            seen_ids = {m.doc_id for m in matches}
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=vector,
+                limit=remaining * 3,
+                with_payload=True,
+            )
+            for result in results:
+                payload = result.payload or {}
+                match = _payload_to_match(payload, float(result.score))
+                if match.doc_id not in seen_ids:
+                    seen_ids.add(match.doc_id)
+                    matches.append(match)
+                    if len(matches) >= limit:
+                        break
+
         return matches
 
 
@@ -424,32 +443,47 @@ class LexicalSupportStore:
         if not query_tokens:
             return []
 
-        scored: list[RetrievalMatch] = []
-        for example in self.examples:
+        def _score_example(example: SupportRagExample) -> float:
             example_tokens = set(tokenize(example.searchable_text))
             if not example_tokens:
-                continue
+                return 0.0
             overlap = len(query_tokens & example_tokens)
             if overlap == 0:
+                return 0.0
+            return overlap / max(len(query_tokens), 1)
+
+        in_category: list[RetrievalMatch] = []
+        other: list[RetrievalMatch] = []
+        for example in self.examples:
+            base_score = _score_example(example)
+            if base_score <= 0:
                 continue
-            score = overlap / max(len(query_tokens), 1)
+            score = base_score
             if category and example.category == category:
                 score += 0.25
-            elif category and example.category != category:
-                score -= 0.05
-            scored.append(
-                RetrievalMatch(
-                    doc_id=example.doc_id,
-                    score=round(score, 4),
-                    ticket_id=example.ticket_id,
-                    subject=example.subject,
-                    category=example.category,
-                    customer_message=example.customer_message,
-                    staff_reply=example.staff_reply,
-                )
+            match = RetrievalMatch(
+                doc_id=example.doc_id,
+                score=round(score, 4),
+                ticket_id=example.ticket_id,
+                subject=example.subject,
+                category=example.category,
+                customer_message=example.customer_message,
+                staff_reply=example.staff_reply,
             )
+            if category and example.category == category:
+                in_category.append(match)
+            elif category and category != "unknown":
+                other.append(match)
+            else:
+                in_category.append(match)
 
-        return sorted(scored, key=lambda item: item.score, reverse=True)[:limit]
+        in_category.sort(key=lambda item: item.score, reverse=True)
+        other.sort(key=lambda item: item.score, reverse=True)
+
+        merged = in_category[:limit]
+        if len(merged) < limit:
+            merged.extend(other[: limit - len(merged)])
+        return merged
 
 
 def build_ticket_query(ticket: dict[str, Any]) -> str:
