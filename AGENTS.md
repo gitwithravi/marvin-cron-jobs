@@ -64,7 +64,6 @@ pm2 restart marvin-dashboard marvin-api
 | Path | Purpose |
 |------|---------|
 | `marvin_core/marvin_api.py` | FastAPI server (entry point for dashboard proxy) |
-| `marvin_core/agent.py` | MARVIN chat intent classification, task dispatch, response formatting |
 | `marvin_core/db.py` | SQLite schema, migrations, and all persistence functions |
 | `marvin_core/openrouter.py` | OpenRouter chat completions client (single `chat_json` method) |
 | `marvin_core/hermes.py` | Hermes (separate AI endpoint) chat client |
@@ -109,20 +108,18 @@ All `/api/*` routes under `dashboard/app/api/` are Next.js server-side route han
 1. Check session auth (`requireApiSession()` from `lib/marvin-server.ts`)
 2. Proxy to the FastAPI MARVIN backend (`proxyToMarvinApi()` from same file)
 
-Some routes (like `mrvn-converse`) call the FastAPI directly with custom logic rather than using the generic proxy.
+Some routes call the FastAPI directly with custom logic rather than using the generic proxy.
 
 ### MARVIN API (FastAPI)
 
 The FastAPI server at `marvin_core/marvin_api.py` exposes endpoints for:
-- `/chat` — MARVIN chat (classify intent → execute/read)
-- `/chat/confirm` — confirm/reject task execution
 - `/todos` — CRUD
 - `/runs` — list task runs (reports)
 - `/runs/{runId}` — get a specific run detail
 - `/alerts/*` — generate and serve alerts
 - `/beszel` — live Beszel system status
 - `/team-status` — team status board
-- `/hermes-converse` — chat with Hermes
+- `/hermes/chat` — chat with Hermes
 - `/support-rag/*` — support RAG suggestions
 - `/invoices/*` — invoice extraction and management
 - `/openrouter-usage` — OpenRouter account usage
@@ -133,7 +130,6 @@ The FastAPI server at `marvin_core/marvin_api.py` exposes endpoints for:
 ```
 marvin_core/          # Shared library (imported by tasks and API)
   marvin_api.py       # FastAPI server (PM2 runs this as a script)
-  agent.py            # Chat intent classification + task orchestration
   db.py               # SQLite schema + all DB functions
   openrouter.py       # OpenRouterClient
   hermes.py           # HermesClient
@@ -269,8 +265,6 @@ All LLM calls go through `marvin_core.openrouter.OpenRouterClient.chat_json()`. 
 8. **No `.env` files committed**: `.gitignore` blocks all `.env` files except `.env.example`. Never add real credentials to example files.
 
 9. **The `kb/` directory** in git status contains exported CSV data. It's not tracked in `.gitignore` (git status shows `??`). It's operational data, not source code.
-
-10. **LangGraph migration is planned but not yet implemented**: `LANGGRAPH_PLAN.md` describes an incremental migration plan. `marvin_core/chat_graph.py` does not exist yet. The current chat orchestration is in `marvin_core/agent.py`.
 
 ## Naming & Style Conventions
 

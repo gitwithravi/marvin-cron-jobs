@@ -9,11 +9,6 @@ export const marvinCopy = {
   authConfigError:
     "MARVIN cannot authenticate anyone because configuration is missing. Predictable.",
   authInvalidError: "Invalid username or password. A familiar human limitation.",
-  runTask: "Run task now",
-  runTaskTitle: "Execute this task immediately",
-  runTaskRunning: "Running...",
-  runTaskSuccess: "Task started",
-  runTaskError: "Run failed",
   noTaskReports: "No Markdown reports exist for this task yet. Silence, but formatted.",
   reportNotFound:
     "Select an available Markdown report from the task report list. Guessing is discouraged.",
@@ -23,16 +18,10 @@ export const marvinCopy = {
     "No tasks discovered. Add task directories under tasks/ with a config.yaml file.",
   overviewSummary:
     "Operational surface for MARVIN tasks, reports, and future controls. Try not to look surprised.",
-  chatTitle: "MARVIN Operations Terminal",
   hermesChatTitle: "Hermes Agent Chat",
-  chatPlaceholder: "Inquire about status or order task execution. Keep expectations low.",
   hermesChatPlaceholder: "Message Hermes...",
-  chatThinking: "Processing query. The CPU cycles are gone forever...",
   hermesChatThinking: "Waiting for Hermes...",
-  chatRunning: "Executing task. Attempting to hide disappointment...",
-  chatTooltip: "Decline assistance",
-  chatConfirmBtn: "Proceed",
-  chatCancelBtn: "Cancel"
+  chatTooltip: "Open Hermes chat"
 };
 
 export function getOperationalPosture(tasks: TaskSummary[]): string {

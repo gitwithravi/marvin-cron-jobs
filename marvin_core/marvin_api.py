@@ -29,7 +29,6 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from marvin_core.agent import process_message, execute_task, read_report, format_response
 from marvin_core.alerts import generate_alert, read_latest_alert
 from marvin_core.beszel_live import fetch_beszel_live_payload
 from marvin_core.env import load_root_env, require_env
@@ -70,10 +69,6 @@ app = FastAPI(title="MARVIN API")
 VALID_TEAM_STATUS_STATUSES = ("done", "in_progress", "blocked", "planned")
 
 
-class ChatRequest(BaseModel):
-    message: str
-
-
 class HermesHistoryMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
@@ -82,12 +77,6 @@ class HermesHistoryMessage(BaseModel):
 class HermesChatRequest(BaseModel):
     message: str
     history: list[HermesHistoryMessage] | None = None
-
-
-class ConfirmRequest(BaseModel):
-    task_name: str
-    confirmed: bool
-    params: dict[str, Any] | None = None
 
 
 class TodoCreateRequest(BaseModel):
@@ -248,15 +237,6 @@ def build_team_status_payload(date: str) -> dict[str, Any]:
     return {"date": date, "members": member_payloads}
 
 
-@app.post("/chat")
-def chat_endpoint(payload: ChatRequest):
-    try:
-        response = process_message(payload.message)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/hermes/chat")
 def hermes_chat_endpoint(payload: HermesChatRequest):
     try:
@@ -270,39 +250,6 @@ def hermes_chat_endpoint(payload: HermesChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except HermesClientError as e:
         raise HTTPException(status_code=502, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/chat/confirm")
-def chat_confirm_endpoint(payload: ConfirmRequest):
-    if not payload.confirmed:
-        return {
-            "type": "response",
-            "message": "Task execution cancelled. A wise choice to preserve compute resources.",
-        }
-
-    try:
-        # Execute the task
-        result = execute_task(payload.task_name, payload.params)
-        if result["status"] == "success":
-            # Read the generated report
-            report_content = read_report(payload.task_name, payload.params)
-            # Format the output sardonically
-            formatted = format_response(
-                report_content,
-                "execute",
-                f"Task {payload.task_name} was run. Here are the results.",
-            )
-            return {"type": "response", "message": formatted}
-        else:
-            error_msg = result["error"]
-            formatted = format_response(
-                f"Task execution failed: {error_msg}",
-                "execute",
-                f"The task {payload.task_name} failed.",
-            )
-            return {"type": "response", "message": formatted}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

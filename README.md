@@ -1,13 +1,12 @@
 # MARVIN Agent
 
-MARVIN is a script-first operations agent with a private web dashboard. Tasks run as normal Python scripts, collect factual data, persist observations, ask an LLM for a compact analysis, and write Markdown reports. The dashboard exposes those reports, live operational views, todos, alerts, OpenRouter usage, and chat access to MARVIN and Hermes.
+MARVIN is a script-first operations agent with a private web dashboard. Tasks run as normal Python scripts, collect factual data, persist observations, ask an LLM for a compact analysis, and write Markdown reports. The dashboard exposes those reports, live operational views, todos, alerts, OpenRouter usage, and Hermes chat access.
 
 ## Features
 
 - **Authenticated dashboard**: Next.js dashboard with signed HTTP-only session cookies.
 - **Report browser**: Lists generated Markdown reports by task and renders report details.
-- **Task orchestration chat**: MARVIN chat classifies dashboard requests, reads reports, and asks for confirmation before executing tasks.
-- **Hermes chat mode**: Separate dashboard chat mode for an OpenAI-compatible Hermes agent endpoint.
+- **Hermes chat**: Dashboard chat surface for an OpenAI-compatible Hermes agent endpoint.
 - **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and MARVIN API.
 - **Invoice reimbursement tracker**: Upload invoice PDFs, extract reimbursement fields with OpenRouter, confirm them, store records in SQLite, and archive PDFs locally.
 - **Team status board**: Fetches member task status for a selected date and shows per-member summaries.
@@ -282,8 +281,6 @@ Qdrant/FastEmbed are the preferred local retrieval stack. If Qdrant is unavailab
 
 The Python MARVIN API exposes local-only endpoints used by the dashboard:
 
-- `POST /chat`: MARVIN task/report conversation.
-- `POST /chat/confirm`: confirmed task execution.
 - `POST /hermes/chat`: Hermes chat through OpenAI-compatible API.
 - `GET /todos`, `POST /todos`, `PATCH /todos/{id}`: todo operations.
 - `GET /todo-tags`, `POST /todo-tags`: tag operations.

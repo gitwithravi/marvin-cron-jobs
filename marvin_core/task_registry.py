@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from typing import Any
 import yaml
 from marvin_core.paths import ROOT_DIR
@@ -81,7 +79,7 @@ def discover_tasks() -> list[dict[str, Any]]:
             "task_name": task_name,
             "display_name": display_name,
             "description": description,
-            "actions": ["execute", "read_report"],
+            "actions": ["read_report"],
             "read_report_params": read_report_params,
         })
 
