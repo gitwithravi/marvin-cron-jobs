@@ -180,6 +180,7 @@ class SupportRagReviewRequest(BaseModel):
 
 class SupportRagIndexRequest(BaseModel):
     use_qdrant: bool = True
+    batch_size: int = 128
 
 
 def _database_path_for_task(task_name: str | None = None) -> str:
@@ -598,7 +599,7 @@ def support_rag_review_endpoint(payload: SupportRagReviewRequest):
 @app.post("/support-rag/index")
 def support_rag_index_endpoint(payload: SupportRagIndexRequest):
     try:
-        return index_support_kb(use_qdrant=payload.use_qdrant)
+        return index_support_kb(use_qdrant=payload.use_qdrant, batch_size=payload.batch_size)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

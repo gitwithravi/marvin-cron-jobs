@@ -164,9 +164,13 @@ def latest_csv(kb_dir: Path, pattern: str) -> Path:
     return matches[-1]
 
 
-def read_csv_rows(path: Path) -> list[dict[str, str]]:
+def iter_csv_rows(path: Path):
     with path.open(newline="", encoding="utf-8-sig") as handle:
-        return list(csv.DictReader(handle))
+        yield from csv.DictReader(handle)
+
+
+def read_csv_rows(path: Path) -> list[dict[str, str]]:
+    return list(iter_csv_rows(path))
 
 
 def _is_test_ticket(subject: str, messages: Iterable[str]) -> bool:
@@ -191,12 +195,21 @@ def build_examples_from_csv(
     tickets_path: Path,
     replies_path: Path,
 ) -> list[SupportRagExample]:
-    tickets = {row["id"]: row for row in read_csv_rows(tickets_path)}
+    examples = list(iter_examples_from_csv(tickets_path=tickets_path, replies_path=replies_path))
+    examples.sort(key=lambda item: (item.category, item.subject, item.ticket_id, item.doc_id))
+    return examples
+
+
+def iter_examples_from_csv(
+    *,
+    tickets_path: Path,
+    replies_path: Path,
+) -> Iterable[SupportRagExample]:
+    tickets = {row["id"]: row for row in iter_csv_rows(tickets_path)}
     replies_by_ticket: dict[str, list[dict[str, str]]] = {}
-    for reply in read_csv_rows(replies_path):
+    for reply in iter_csv_rows(replies_path):
         replies_by_ticket.setdefault(reply["ticket_id"], []).append(reply)
 
-    examples: list[SupportRagExample] = []
     for ticket_id, ticket in tickets.items():
         replies = sorted(
             replies_by_ticket.get(ticket_id, []),
@@ -232,25 +245,20 @@ def build_examples_from_csv(
                 continue
 
             category = infer_support_category(subject, context, message)
-            examples.append(
-                SupportRagExample(
-                    doc_id=_stable_doc_id(ticket_id, reply.get("id"), message),
-                    ticket_id=ticket_id,
-                    ticket_number=ticket.get("ticket_number") or None,
-                    subject=subject,
-                    category=category,
-                    status=ticket.get("status") or "unknown",
-                    priority=ticket.get("priority") or "unknown",
-                    customer_message=context,
-                    staff_reply=message,
-                    created_at=reply.get("created_at") or ticket.get("created_at"),
-                    staff_reply_id=reply.get("id") or None,
-                    source=str(tickets_path.parent),
-                )
+            yield SupportRagExample(
+                doc_id=_stable_doc_id(ticket_id, reply.get("id"), message),
+                ticket_id=ticket_id,
+                ticket_number=ticket.get("ticket_number") or None,
+                subject=subject,
+                category=category,
+                status=ticket.get("status") or "unknown",
+                priority=ticket.get("priority") or "unknown",
+                customer_message=context,
+                staff_reply=message,
+                created_at=reply.get("created_at") or ticket.get("created_at"),
+                staff_reply_id=reply.get("id") or None,
+                source=str(tickets_path.parent),
             )
-
-    examples.sort(key=lambda item: (item.category, item.subject, item.ticket_id, item.doc_id))
-    return examples
 
 
 def load_kb_examples(kb_dir: str | Path = "kb") -> list[SupportRagExample]:
@@ -269,6 +277,55 @@ def write_examples_jsonl(examples: Iterable[SupportRagExample], output_path: str
             handle.write(json.dumps(asdict(example), sort_keys=True, ensure_ascii=False) + "\n")
             count += 1
     return count
+
+
+def _write_examples_jsonl_and_upsert_qdrant(
+    *,
+    examples: Iterable[SupportRagExample],
+    output_path: str | Path,
+    qdrant_store: "QdrantSupportStore | None",
+    batch_size: int,
+) -> tuple[int, int, str | None]:
+    path = project_path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    jsonl_count = 0
+    qdrant_count = 0
+    qdrant_error: str | None = None
+    batch: list[SupportRagExample] = []
+    qdrant_ready = qdrant_store is not None
+    if qdrant_ready:
+        try:
+            qdrant_store.recreate_collection()
+        except Exception as exc:
+            qdrant_error = str(exc)
+            qdrant_ready = False
+
+    with path.open("w", encoding="utf-8") as handle:
+        for example in examples:
+            handle.write(json.dumps(asdict(example), sort_keys=True, ensure_ascii=False) + "\n")
+            jsonl_count += 1
+            if not qdrant_ready:
+                continue
+
+            batch.append(example)
+            if len(batch) < batch_size:
+                continue
+
+            try:
+                qdrant_count += qdrant_store.upsert_example_batch(batch)
+            except Exception as exc:
+                qdrant_error = str(exc)
+                qdrant_ready = False
+            finally:
+                batch = []
+
+    if qdrant_ready and batch:
+        try:
+            qdrant_count += qdrant_store.upsert_example_batch(batch)
+        except Exception as exc:
+            qdrant_error = str(exc)
+
+    return jsonl_count, qdrant_count, qdrant_error
 
 
 def read_examples_jsonl(path: str | Path = DEFAULT_EXAMPLES_PATH) -> list[SupportRagExample]:
@@ -361,12 +418,16 @@ class QdrantSupportStore:
         )
 
     def upsert_examples(self, examples: list[SupportRagExample]) -> int:
+        if not examples:
+            return 0
+        return self.upsert_examples_in_batches(examples, batch_size=len(examples))
+
+    def upsert_example_batch(self, examples: list[SupportRagExample]) -> int:
         from qdrant_client.models import PointStruct
 
         if not examples:
             return 0
 
-        self.recreate_collection()
         vectors = self.embedding_provider.embed([example.searchable_text for example in examples])
         points = [
             PointStruct(
@@ -378,6 +439,23 @@ class QdrantSupportStore:
         ]
         self.client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
+
+    def upsert_examples_in_batches(self, examples: Iterable[SupportRagExample], *, batch_size: int = 128) -> int:
+        batch: list[SupportRagExample] = []
+        total = 0
+        created_collection = False
+        for example in examples:
+            if not created_collection:
+                self.recreate_collection()
+                created_collection = True
+            batch.append(example)
+            if len(batch) < batch_size:
+                continue
+            total += self.upsert_example_batch(batch)
+            batch = []
+        if batch:
+            total += self.upsert_example_batch(batch)
+        return total
 
     def search(self, query: str, *, limit: int = 5, category: str | None = None) -> list[RetrievalMatch]:
         from qdrant_client.models import Filter, FieldCondition, MatchValue
@@ -701,21 +779,32 @@ def index_support_kb(
     examples_path: str | Path = DEFAULT_EXAMPLES_PATH,
     collection_name: str = DEFAULT_COLLECTION,
     use_qdrant: bool = True,
+    batch_size: int = 128,
 ) -> dict[str, Any]:
-    examples = load_kb_examples(kb_dir)
-    jsonl_count = write_examples_jsonl(examples, examples_path)
-    qdrant_count = 0
+    kb_path = project_path(kb_dir)
+    tickets_path = latest_csv(kb_path, "support_tickets_export_*.csv")
+    replies_path = latest_csv(kb_path, "support_ticket_replies_export_*.csv")
+    examples = iter_examples_from_csv(tickets_path=tickets_path, replies_path=replies_path)
+    qdrant_store = None
     qdrant_error: str | None = None
 
     if use_qdrant:
         try:
-            store = QdrantSupportStore(collection_name=collection_name)
-            qdrant_count = store.upsert_examples(examples)
+            qdrant_store = QdrantSupportStore(collection_name=collection_name)
         except Exception as exc:
             qdrant_error = str(exc)
+            qdrant_store = None
 
+    jsonl_count, qdrant_count, streamed_qdrant_error = _write_examples_jsonl_and_upsert_qdrant(
+        examples=examples,
+        output_path=examples_path,
+        qdrant_store=qdrant_store,
+        batch_size=max(1, batch_size),
+    )
+    if qdrant_error is None:
+        qdrant_error = streamed_qdrant_error
     return {
-        "examples": len(examples),
+        "examples": jsonl_count,
         "jsonl_examples": jsonl_count,
         "examples_path": str(project_path(examples_path)),
         "qdrant_examples": qdrant_count,

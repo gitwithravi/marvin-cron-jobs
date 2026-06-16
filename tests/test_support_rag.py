@@ -12,6 +12,7 @@ from marvin_core.support_rag import (
     SupportRagEngine,
     build_examples_from_csv,
     infer_support_category,
+    index_support_kb,
     write_examples_jsonl,
 )
 
@@ -162,3 +163,54 @@ def test_support_rag_audit_persistence(tmp_path):
 def test_infer_support_category():
     assert infer_support_category("Quiz auto submitted", "Need reattempt") == "exam_quiz"
     assert infer_support_category("Certificate date issue", "Download changed date") == "certificate"
+
+
+def test_index_support_kb_processes_qdrant_in_batches(tmp_path, monkeypatch):
+    kb_dir = tmp_path / "kb"
+    kb_dir.mkdir()
+    write_csv(
+        kb_dir / "support_tickets_export_2026.csv",
+        """
+id,ticket_number,user_id,subject,status,priority,created_at,updated_at
+1,TKT-1,10,Payment not reflecting,closed,high,2026-01-01 10:00:00,2026-01-01 10:10:00
+2,TKT-2,20,Certificate issue,closed,medium,2026-01-01 10:00:00,2026-01-01 10:10:00
+3,TKT-3,30,Course access problem,closed,medium,2026-01-01 10:00:00,2026-01-01 10:10:00
+""",
+    )
+    write_csv(
+        kb_dir / "support_ticket_replies_export_2026.csv",
+        """
+id,ticket_id,user_id,message,created_at,updated_at
+11,1,10,I paid but the course is not showing,2026-01-01 10:00:00,2026-01-01 10:00:00
+12,1,1,"Hi, the payment was not captured and will be refunded.",2026-01-01 10:10:00,2026-01-01 10:10:00
+21,2,20,I need my certificate updated,2026-01-01 10:00:00,2026-01-01 10:00:00
+22,2,1,"Hi, please regenerate the certificate after checking progress.",2026-01-01 10:10:00,2026-01-01 10:10:00
+31,3,30,My course is not visible after purchase,2026-01-01 10:00:00,2026-01-01 10:00:00
+32,3,1,"Hi, I am checking the access state.",2026-01-01 10:10:00,2026-01-01 10:10:00
+""",
+    )
+
+    batch_sizes = []
+
+    class FakeQdrantStore:
+        def __init__(self, *, collection_name):
+            self.collection_name = collection_name
+
+        def recreate_collection(self):
+            return None
+
+        def upsert_example_batch(self, examples):
+            batch_sizes.append(len(examples))
+            return len(examples)
+
+    monkeypatch.setattr("marvin_core.support_rag.QdrantSupportStore", FakeQdrantStore)
+
+    result = index_support_kb(
+        kb_dir=kb_dir,
+        examples_path=tmp_path / "examples.jsonl",
+        batch_size=2,
+    )
+
+    assert result["examples"] == 3
+    assert result["qdrant_examples"] == 3
+    assert batch_sizes == [2, 1]
