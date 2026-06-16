@@ -1,4 +1,7 @@
+import email
+import email.policy
 import hashlib
+import imaplib
 import json
 import os
 import re
@@ -493,7 +496,106 @@ def _send_capture_notification(todo: dict[str, Any], duplicate: bool = False) ->
         return "failed", str(exc)
 
 
+def _parse_email_bytes(raw_bytes: bytes) -> dict[str, Any]:
+    msg = email.message_from_bytes(raw_bytes, policy=email.policy.default)
+    text_body = None
+    html_body = None
+    attachments: list[dict[str, Any]] = []
+    for part in msg.walk():
+        content_type = part.get_content_type()
+        disposition = str(part.get_content_disposition() or "")
+        if "attachment" in disposition:
+            filename = part.get_filename() or "attachment"
+            attachments.append({"filename": filename, "content_type": content_type})
+        elif content_type == "text/plain" and text_body is None:
+            try:
+                text_body = part.get_content()
+            except Exception:
+                text_body = None
+        elif content_type == "text/html" and html_body is None:
+            try:
+                html_body = part.get_content()
+            except Exception:
+                html_body = None
+    raw_email = raw_bytes.decode("utf-8", errors="replace")
+    return {
+        "from": str(msg.get("From") or ""),
+        "to": str(msg.get("To") or ""),
+        "subject": str(msg.get("Subject") or ""),
+        "messageId": str(msg.get("Message-ID") or ""),
+        "date": str(msg.get("Date") or ""),
+        "headers": dict(msg.items()),
+        "textBody": text_body,
+        "htmlBody": html_body,
+        "rawEmail": raw_email,
+        "attachments": attachments,
+    }
+
+
+def fetch_imap_emails(
+    host: str,
+    username: str,
+    password: str,
+    port: int = 993,
+    folder: str = "INBOX",
+    mark_read: bool = True,
+) -> list[dict[str, Any]]:
+    conn = imaplib.IMAP4_SSL(host, port)
+    try:
+        conn.login(username, password)
+        conn.select(folder)
+        status, messages = conn.search(None, "UNSEEN")
+        if status != "OK":
+            return []
+        results: list[dict[str, Any]] = []
+        for num in messages[0].split():
+            fetch_status, data = conn.fetch(num, "(RFC822)")
+            if fetch_status != "OK" or not data or not data[0]:
+                continue
+            raw_bytes = data[0][1]
+            if not isinstance(raw_bytes, bytes):
+                continue
+            payload = _parse_email_bytes(raw_bytes)
+            results.append(payload)
+            if mark_read:
+                conn.store(num, "+FLAGS", "\\Seen")
+        return results
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+
+def process_imap_emails(
+    host: str,
+    username: str,
+    password: str,
+    port: int = 993,
+    folder: str = "INBOX",
+    mark_read: bool = True,
+) -> list[dict[str, Any]]:
+    emails = fetch_imap_emails(host, username, password, port, folder, mark_read)
+    results: list[dict[str, Any]] = []
+    for email_data in emails:
+        try:
+            result = process_email_capture(email_data)
+            results.append(result)
+        except EmailCaptureError as e:
+            results.append(
+                {
+                    "success": False,
+                    "error": str(e),
+                    "from": email_data.get("from"),
+                    "subject": email_data.get("subject"),
+                }
+            )
+    return results
+
+
+
 def process_email_capture(data: dict[str, Any]) -> dict[str, Any]:
+
     payload = parse_payload(data)
     received_at = _parse_received_at(payload.date)
     body_hash = _normalized_hash(payload.subject, payload.text_body or payload.html_body, payload.from_email)
