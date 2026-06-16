@@ -51,7 +51,9 @@ from marvin_core.support_rag import (
 from marvin_core.todos import (
     classify_and_apply_tags,
     create_tag,
+    create_person,
     create_todo,
+    list_people,
     list_tags,
     list_todos,
     retag_todo,
@@ -101,6 +103,7 @@ class TodoCreateRequest(BaseModel):
     project: str | None = None
     reviewed: bool | None = None
     raw_context: str | None = None
+    waiting_on_person_id: int | None = None
 
 
 class TodoUpdateRequest(BaseModel):
@@ -115,6 +118,7 @@ class TodoUpdateRequest(BaseModel):
     project: str | None = None
     reviewed: bool | None = None
     raw_context: str | None = None
+    waiting_on_person_id: int | None = None
 
 
 class TodoRetagRequest(BaseModel):
@@ -124,6 +128,10 @@ class TodoRetagRequest(BaseModel):
 class TagCreateRequest(BaseModel):
     name: str
     description: str | None = None
+
+
+class PersonCreateRequest(BaseModel):
+    name: str
 
 
 class InvoiceSaveRequest(BaseModel):
@@ -311,6 +319,24 @@ def todo_tags_endpoint():
 def create_todo_tag_endpoint(payload: TagCreateRequest):
     try:
         return {"tag": create_tag(payload.name, payload.description)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/todo-people")
+def todo_people_endpoint():
+    try:
+        return {"people": list_people()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/todo-people")
+def create_todo_person_endpoint(payload: PersonCreateRequest):
+    try:
+        return {"person": create_person(payload.name)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -623,6 +649,7 @@ def create_todo_endpoint(payload: TodoCreateRequest, background_tasks: Backgroun
             project=payload.project,
             reviewed=payload.reviewed,
             raw_context=payload.raw_context,
+            waiting_on_person_id=payload.waiting_on_person_id,
         )
         if payload.tag_ids is None:
             background_tasks.add_task(classify_and_apply_tags, todo["id"])

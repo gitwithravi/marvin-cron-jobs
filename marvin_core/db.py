@@ -136,6 +136,14 @@ CREATE TABLE IF NOT EXISTS todo_tags (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS todo_people (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -148,8 +156,11 @@ CREATE TABLE IF NOT EXISTS todos (
     project TEXT NOT NULL DEFAULT 'unknown',
     reviewed INTEGER NOT NULL DEFAULT 1,
     raw_context TEXT,
+    waiting_on_person_id INTEGER,
+    completed_at TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (waiting_on_person_id) REFERENCES todo_people(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS todo_tag_links (
@@ -371,6 +382,9 @@ MIGRATIONS = [
     ("todos_project", "ALTER TABLE todos ADD COLUMN project TEXT NOT NULL DEFAULT 'unknown'"),
     ("todos_reviewed", "ALTER TABLE todos ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1"),
     ("todos_raw_context", "ALTER TABLE todos ADD COLUMN raw_context TEXT"),
+    ("todo_people_table", "CREATE TABLE IF NOT EXISTS todo_people (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
+    ("todos_waiting_on_person_id", "ALTER TABLE todos ADD COLUMN waiting_on_person_id INTEGER REFERENCES todo_people(id) ON DELETE SET NULL"),
+    ("todos_completed_at", "ALTER TABLE todos ADD COLUMN completed_at TEXT"),
 ]
 
 
@@ -416,6 +430,11 @@ def run_migrations(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_project ON todos(project)")
     if "reviewed" in todo_columns:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_reviewed ON todos(reviewed)")
+    if "waiting_on_person_id" in todo_columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_waiting_on_person_id ON todos(waiting_on_person_id)")
+    if "completed_at" in todo_columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completed_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_todo_people_name_key ON todo_people(name_key)")
     conn.commit()
 
 

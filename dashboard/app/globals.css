@@ -2273,22 +2273,16 @@ label {
 }
 
 .todo-layout {
-  align-items: start;
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-}
-
-.todo-main,
-.todo-side {
-  display: grid;
-  gap: 18px;
+  min-width: 0;
 }
 
 .todo-capture,
-.side-panel,
 .todo-list-section,
-.todo-item {
+.todo-item,
+.kanban-column,
+.followup-person-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2296,15 +2290,17 @@ label {
 }
 
 .todo-capture,
-.side-panel,
 .todo-list-section {
   display: grid;
   gap: 16px;
   padding: 18px;
 }
 
+.todo-list-section {
+  overflow: hidden;
+}
+
 .todo-capture h2,
-.side-panel h2,
 .todo-list-section h2 {
   margin: 0;
 }
@@ -2318,15 +2314,23 @@ label {
 .section-heading,
 .todo-item-header,
 .todo-meta-row,
-.quick-retag {
+.quick-retag,
+.history-toolbar,
+.kanban-column-header {
   align-items: center;
   display: flex;
   gap: 12px;
 }
 
 .section-heading,
-.todo-item-header {
+.todo-item-header,
+.history-toolbar,
+.kanban-column-header {
   justify-content: space-between;
+}
+
+.section-heading {
+  flex-wrap: wrap;
 }
 
 .todo-list {
@@ -2334,13 +2338,18 @@ label {
   gap: 12px;
 }
 
-.todo-item {
+.todo-item,
+.todo-card {
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 15px;
 }
 
-.todo-item h3 {
+.todo-item h3,
+.todo-card h3,
+.kanban-column h3,
+.followup-person-card h3 {
   line-height: 1.25;
   margin: 0;
   overflow-wrap: anywhere;
@@ -2349,6 +2358,7 @@ label {
 .todo-meta-row,
 .tag-row {
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .todo-status,
@@ -2360,8 +2370,12 @@ label {
   font-size: 0.76rem;
   font-weight: 800;
   min-height: 28px;
+  max-width: 100%;
+  overflow: hidden;
   padding: 6px 9px;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .todo-status,
@@ -2412,6 +2426,16 @@ label {
   gap: 7px;
   min-height: 34px;
   padding: 6px 10px;
+}
+
+.button:focus-visible,
+.tab:focus-visible,
+.check-row:focus-within,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(71, 127, 104, 0.3);
+  outline-offset: 2px;
 }
 
 .form-check-row {
@@ -2594,6 +2618,169 @@ label {
 
 .quick-retag input {
   max-width: 260px;
+}
+
+.todo-view-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.todo-toolbar {
+  align-items: end;
+  background: #eef3f1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.todo-toolbar-filters {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+  min-width: min(100%, 680px);
+}
+
+.todo-toolbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.todo-view-switcher .tab {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.todo-view-switcher .tab.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
+.kanban-board {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(280px, 1fr));
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-color: var(--border-strong) transparent;
+  width: 100%;
+}
+
+.kanban-column {
+  align-content: start;
+  background: #f4f7f6;
+  display: grid;
+  gap: 14px;
+  min-height: 520px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.kanban-column-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.kanban-column-header .muted {
+  margin: 4px 0 0;
+}
+
+.kanban-column-body,
+.followup-list,
+.followup-task-list,
+.history-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.kanban-empty {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+  min-height: 104px;
+  padding: 14px;
+  text-align: center;
+}
+
+.todo-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(17, 25, 29, 0.06);
+  cursor: grab;
+  padding: 14px;
+}
+
+.todo-card:active {
+  cursor: grabbing;
+}
+
+.todo-card-header {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.todo-card-title {
+  min-width: 0;
+}
+
+.todo-card-title .muted {
+  display: -webkit-box;
+  line-height: 1.35;
+  margin: 7px 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.todo-card h3 {
+  font-size: 1.02rem;
+}
+
+.todo-card-edit {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.todo-card-footer,
+.followup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.todo-card-footer select {
+  min-height: 38px;
+  width: 100%;
+}
+
+.followup-actions button {
+  flex: 1 1 140px;
+}
+
+.followup-person-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.history-toolbar {
+  flex-wrap: wrap;
 }
 
 .team-status-stack {
@@ -2824,7 +3011,6 @@ label {
 
 @media (max-width: 900px) {
   .app-shell,
-  .todo-layout,
   .email-capture-layout {
     grid-template-columns: 1fr;
   }
@@ -2835,6 +3021,19 @@ label {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .todo-toolbar-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-board {
     grid-template-columns: 1fr;
   }
 

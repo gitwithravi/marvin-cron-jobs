@@ -7,7 +7,7 @@ export default function TodosPage() {
         <div>
           <p className="eyebrow">Todos</p>
           <h1>Task Memory</h1>
-          <p className="muted">Capture work, let MARVIN tag it, and keep the list filterable.</p>
+          <p className="muted">Capture work into triage, move it across the board, and chase follow-ups by person.</p>
         </div>
       </header>
       <TodoManager />

@@ -96,7 +96,22 @@ def _row_to_tag(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def _row_to_person(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
 def _row_to_todo(row: sqlite3.Row, tags: list[dict[str, Any]]) -> dict[str, Any]:
+    waiting_on_person = None
+    if row["waiting_on_person_id"] is not None and row["waiting_on_person_name"] is not None:
+        waiting_on_person = {
+            "id": row["waiting_on_person_id"],
+            "name": row["waiting_on_person_name"],
+        }
     return {
         "id": row["id"],
         "title": row["title"],
@@ -109,13 +124,16 @@ def _row_to_todo(row: sqlite3.Row, tags: list[dict[str, Any]]) -> dict[str, Any]
         "project": row["project"],
         "reviewed": bool(row["reviewed"]),
         "raw_context": row["raw_context"],
+        "completed_at": row["completed_at"],
+        "waiting_on_person_id": row["waiting_on_person_id"],
+        "waiting_on_person": waiting_on_person,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "tags": tags,
     }
 
 
-def _validate_status(status: str | None, *, default: str = "idea") -> str:
+def _validate_status(status: str | None, *, default: str = "inbox") -> str:
     value = (status or default).strip().lower()
     if value not in TODO_STATUSES:
         raise ValueError(f"Invalid todo status: {status}")
@@ -245,6 +263,50 @@ def list_tags(conn: sqlite3.Connection | None = None) -> list[dict[str, Any]]:
             conn.close()
 
 
+def list_people(conn: sqlite3.Connection | None = None) -> list[dict[str, Any]]:
+    owns_conn = conn is None
+    conn = conn or _connect()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM todo_people ORDER BY lower(name)"
+        ).fetchall()
+        return [_row_to_person(row) for row in rows]
+    finally:
+        if owns_conn:
+            conn.close()
+
+
+def create_person(
+    name: str,
+    conn: sqlite3.Connection | None = None,
+) -> dict[str, Any]:
+    clean_name = re.sub(r"\s+", " ", name.strip())
+    if not clean_name:
+        raise ValueError("Person name is required.")
+
+    owns_conn = conn is None
+    conn = conn or _connect()
+    try:
+        now = _now()
+        cursor = conn.execute(
+            """
+            INSERT INTO todo_people (name, name_key, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(name_key) DO UPDATE SET
+                name = excluded.name,
+                updated_at = excluded.updated_at
+            RETURNING *
+            """,
+            (clean_name, _name_key(clean_name), now, now),
+        )
+        row = cursor.fetchone()
+        conn.commit()
+        return _row_to_person(row)
+    finally:
+        if owns_conn:
+            conn.close()
+
+
 def create_tag(
     name: str,
     description: str | None = None,
@@ -360,7 +422,17 @@ def classify_todo_tags(title: str, tags: list[dict[str, Any]]) -> list[int]:
 
 
 def _load_todo(conn: sqlite3.Connection, todo_id: int) -> dict[str, Any] | None:
-    row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+    row = conn.execute(
+        """
+        SELECT
+            todos.*,
+            todo_people.name AS waiting_on_person_name
+        FROM todos
+        LEFT JOIN todo_people ON todo_people.id = todos.waiting_on_person_id
+        WHERE todos.id = ?
+        """,
+        (todo_id,),
+    ).fetchone()
     if not row:
         return None
     tags = [
@@ -420,10 +492,21 @@ def list_todos(
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = conn.execute(
             f"""
-            SELECT *
+            SELECT
+                todos.*,
+                todo_people.name AS waiting_on_person_name
             FROM todos
+            LEFT JOIN todo_people ON todo_people.id = todos.waiting_on_person_id
             {where}
             ORDER BY
+                CASE status
+                    WHEN 'update_needed' THEN 0
+                    WHEN 'pending_on_others' THEN 1
+                    WHEN 'wip' THEN 2
+                    WHEN 'need_to_plan' THEN 3
+                    WHEN 'idea' THEN 4
+                    ELSE 5
+                END,
                 CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
                 CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
                 due_date ASC,
@@ -442,6 +525,21 @@ def list_todos(
             conn.close()
 
 
+def _normalize_person_id(
+    conn: sqlite3.Connection,
+    waiting_on_person_id: int | None,
+) -> int | None:
+    if waiting_on_person_id in (None, ""):
+        return None
+    row = conn.execute(
+        "SELECT id FROM todo_people WHERE id = ?",
+        (int(waiting_on_person_id),),
+    ).fetchone()
+    if not row:
+        raise ValueError("Waiting on person not found.")
+    return int(row["id"])
+
+
 def create_todo(
     *,
     title: str,
@@ -457,6 +555,7 @@ def create_todo(
     project: str | None = None,
     reviewed: bool | None = None,
     raw_context: str | None = None,
+    waiting_on_person_id: int | None = None,
 ) -> dict[str, Any]:
     clean_title = re.sub(r"\s+", " ", title.strip())
     if not clean_title:
@@ -465,11 +564,15 @@ def create_todo(
     conn = _connect()
     try:
         tags = list_tags(conn)
+        normalized_status = _validate_status(status)
         parsed_due_date = (
             _validate_due_date(due_date)
             if due_date
             else parse_natural_due_date(clean_title) or parse_natural_due_date(deadline_text)
         )
+        normalized_waiting_on_person_id = _normalize_person_id(conn, waiting_on_person_id)
+        if normalized_status == "pending_on_others" and normalized_waiting_on_person_id is None:
+            raise ValueError("Pending on others todos must have a person assigned.")
         assigned_tag_ids = _normalize_tag_ids(
             conn,
             tag_ids
@@ -482,13 +585,13 @@ def create_todo(
         cursor = conn.execute(
             """
             INSERT INTO todos
-                (title, notes, status, priority, due_date, source, source_ref_id, project, reviewed, raw_context, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (title, notes, status, priority, due_date, source, source_ref_id, project, reviewed, raw_context, waiting_on_person_id, completed_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 clean_title,
                 notes or None,
-                _validate_status(status),
+                normalized_status,
                 _validate_priority(priority),
                 parsed_due_date,
                 (source or "manual").strip().lower(),
@@ -496,6 +599,8 @@ def create_todo(
                 _validate_project(project),
                 1 if reviewed is not False else 0,
                 raw_context or None,
+                normalized_waiting_on_person_id,
+                now if normalized_status == "done" else None,
                 now,
                 now,
             ),
@@ -554,6 +659,7 @@ def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
         "project",
         "reviewed",
         "raw_context",
+        "waiting_on_person_id",
     }
     unknown = set(updates) - allowed
     if unknown:
@@ -561,11 +667,22 @@ def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
 
     conn = _connect()
     try:
-        if not _load_todo(conn, todo_id):
+        current_todo = _load_todo(conn, todo_id)
+        if not current_todo:
             raise LookupError("Todo not found.")
 
         fields: list[str] = []
         params: list[Any] = []
+        next_status = current_todo["status"]
+        if "status" in updates:
+            next_status = _validate_status(updates["status"])
+        next_waiting_on_person_id = current_todo["waiting_on_person_id"]
+        if "waiting_on_person_id" in updates:
+            next_waiting_on_person_id = _normalize_person_id(conn, updates["waiting_on_person_id"])
+        if next_status == "pending_on_others" and next_waiting_on_person_id is None:
+            raise ValueError("Pending on others todos must have a person assigned.")
+        if next_status != "pending_on_others" and "waiting_on_person_id" not in updates and current_todo["status"] == "pending_on_others":
+            next_waiting_on_person_id = None
         if "title" in updates:
             title = re.sub(r"\s+", " ", str(updates["title"]).strip())
             if not title:
@@ -577,7 +694,7 @@ def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
             params.append(updates["notes"] or None)
         if "status" in updates:
             fields.append("status = ?")
-            params.append(_validate_status(updates["status"]))
+            params.append(next_status)
         if "priority" in updates:
             fields.append("priority = ?")
             params.append(_validate_priority(updates["priority"]))
@@ -599,6 +716,15 @@ def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
         if "raw_context" in updates:
             fields.append("raw_context = ?")
             params.append(updates["raw_context"] or None)
+        if "waiting_on_person_id" in updates or current_todo["status"] == "pending_on_others" or next_status == "pending_on_others":
+            fields.append("waiting_on_person_id = ?")
+            params.append(next_waiting_on_person_id if next_status == "pending_on_others" else None)
+        if next_status == "done":
+            fields.append("completed_at = ?")
+            params.append(current_todo["completed_at"] or _now())
+        elif current_todo["completed_at"] is not None:
+            fields.append("completed_at = ?")
+            params.append(None)
         if fields:
             fields.append("updated_at = ?")
             params.append(_now())

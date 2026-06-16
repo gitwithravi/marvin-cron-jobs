@@ -9,6 +9,13 @@ type TodoTag = {
   is_protected: boolean;
 };
 
+type TodoPerson = {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type Todo = {
   id: number;
   title: string;
@@ -21,6 +28,9 @@ type Todo = {
   project: TodoProject;
   reviewed: boolean;
   raw_context: string | null;
+  completed_at: string | null;
+  waiting_on_person_id: number | null;
+  waiting_on_person: { id: number; name: string } | null;
   created_at: string;
   updated_at: string;
   tags: TodoTag[];
@@ -29,10 +39,24 @@ type Todo = {
 type TodoStatus = "inbox" | "idea" | "need_to_plan" | "wip" | "update_needed" | "pending_on_others" | "done";
 type TodoPriority = "low" | "medium" | "high" | "urgent";
 type TodoProject = "vitbhopal" | "vityarthi" | "recruitment" | "personal" | "unknown";
+type TodoView = "board" | "followups" | "history";
+type BoardColumnKey = "triage" | "wip" | "update_needed" | "pending_on_others";
+type PendingPromptState = {
+  todo: Todo;
+  targetStatus: TodoStatus;
+};
 
+const triageStatuses: TodoStatus[] = ["inbox", "idea", "need_to_plan"];
+const boardColumns: { key: BoardColumnKey; title: string; statuses: TodoStatus[] }[] = [
+  { key: "triage", title: "Triage", statuses: triageStatuses },
+  { key: "wip", title: "WIP", statuses: ["wip"] },
+  { key: "update_needed", title: "Update Needed", statuses: ["update_needed"] },
+  { key: "pending_on_others", title: "Pending on Others", statuses: ["pending_on_others"] }
+];
 const statuses: TodoStatus[] = ["inbox", "idea", "need_to_plan", "wip", "update_needed", "pending_on_others", "done"];
 const priorities: TodoPriority[] = ["low", "medium", "high", "urgent"];
 const projects: TodoProject[] = ["unknown", "vitbhopal", "vityarthi", "recruitment", "personal"];
+const doneVisibilityDays = 7;
 
 function label(value: string) {
   return value.replace(/_/g, " ");
@@ -46,6 +70,34 @@ function textHasDate(value: string) {
   return /\b(\d{4}-\d{2}-\d{2}|today|tomorrow|next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*|(early|mid|late)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\b/i.test(value);
 }
 
+function toMillis(value: string | null | undefined) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isCompletedWithinWindow(todo: Todo, days: number) {
+  if (!todo.completed_at) return false;
+  const ageMs = Date.now() - toMillis(todo.completed_at);
+  return ageMs <= days * 24 * 60 * 60 * 1000;
+}
+
+function priorityRank(priority: TodoPriority) {
+  return priorities.indexOf(priority);
+}
+
+function sortTodos(items: Todo[]) {
+  return [...items].sort((left, right) => {
+    const priorityDiff = priorityRank(left.priority) - priorityRank(right.priority);
+    if (priorityDiff !== 0) return priorityDiff;
+    const dueDiff = toMillis(left.due_date) - toMillis(right.due_date);
+    if (left.due_date && right.due_date && dueDiff !== 0) return dueDiff;
+    if (left.due_date && !right.due_date) return -1;
+    if (!left.due_date && right.due_date) return 1;
+    return toMillis(right.updated_at) - toMillis(left.updated_at);
+  });
+}
+
 async function readJson(response: Response) {
   const data = await response.json();
   if (!response.ok) {
@@ -57,11 +109,13 @@ async function readJson(response: Response) {
 export function TodoManager() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tags, setTags] = useState<TodoTag[]>([]);
+  const [people, setPeople] = useState<TodoPerson[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
-  const [statusFilter, setStatusFilter] = useState<TodoStatus | "open" | "all">("open");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "email" | "manual">("all");
   const [projectFilter, setProjectFilter] = useState<TodoProject | "all">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "email" | "manual">("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | "unreviewed" | "reviewed">("all");
+  const [view, setView] = useState<TodoView>("board");
+  const [showOlderDone, setShowOlderDone] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -70,19 +124,24 @@ export function TodoManager() {
   const [deadlineText, setDeadlineText] = useState("");
   const [tagName, setTagName] = useState("");
   const [tagDescription, setTagDescription] = useState("");
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  const [quickTagTodoId, setQuickTagTodoId] = useState<number | null>(null);
-  const [quickTagName, setQuickTagName] = useState("");
+  const [draggingTodoId, setDraggingTodoId] = useState<number | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<PendingPromptState | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string>("");
+  const [newPersonName, setNewPersonName] = useState("");
 
   async function refresh() {
     setError("");
     try {
-      const [todoData, tagData] = await Promise.all([
+      const [todoData, tagData, peopleData] = await Promise.all([
         fetch("/api/todos?include_done=true").then(readJson),
-        fetch("/api/todo-tags").then(readJson)
+        fetch("/api/todo-tags").then(readJson),
+        fetch("/api/todo-people").then(readJson)
       ]);
       setTodos(todoData.todos || []);
       setTags(tagData.tags || []);
+      setPeople(peopleData.people || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -94,21 +153,91 @@ export function TodoManager() {
     refresh();
   }, []);
 
-  const filteredTodos = useMemo(() => {
-    return todos.filter((todo) => {
-      if (statusFilter === "open" && todo.status === "done") return false;
-      if (statusFilter !== "open" && statusFilter !== "all" && todo.status !== statusFilter) return false;
-      if (sourceFilter !== "all" && todo.source !== sourceFilter) return false;
-      if (projectFilter !== "all" && todo.project !== projectFilter) return false;
-      if (reviewFilter === "unreviewed" && todo.reviewed) return false;
-      if (reviewFilter === "reviewed" && !todo.reviewed) return false;
-      if (selectedTagIds.length > 0) {
-        const todoTagIds = new Set(todo.tags.map((tag) => tag.id));
-        return selectedTagIds.every((tagId) => todoTagIds.has(tagId));
-      }
-      return true;
+  const visibleOpenTodos = useMemo(() => {
+    return sortTodos(
+      todos.filter((todo) => {
+        if (todo.status === "done") return false;
+        if (sourceFilter !== "all" && todo.source !== sourceFilter) return false;
+        if (projectFilter !== "all" && todo.project !== projectFilter) return false;
+        if (reviewFilter === "unreviewed" && todo.reviewed) return false;
+        if (reviewFilter === "reviewed" && !todo.reviewed) return false;
+        if (selectedTagIds.length > 0) {
+          const todoTagIds = new Set(todo.tags.map((tag) => tag.id));
+          return selectedTagIds.every((tagId) => todoTagIds.has(tagId));
+        }
+        return true;
+      })
+    );
+  }, [projectFilter, reviewFilter, selectedTagIds, sourceFilter, todos]);
+
+  const historyTodos = useMemo(() => {
+    return sortTodos(
+      todos.filter((todo) => {
+        if (todo.status !== "done") return false;
+        if (!showOlderDone && !isCompletedWithinWindow(todo, doneVisibilityDays)) return false;
+        return true;
+      })
+    );
+  }, [showOlderDone, todos]);
+
+  const followupGroups = useMemo(() => {
+    const grouped = new Map<number, { person: TodoPerson | { id: number; name: string }; todos: Todo[] }>();
+    visibleOpenTodos
+      .filter((todo) => todo.status === "pending_on_others" && todo.waiting_on_person)
+      .forEach((todo) => {
+        const person = todo.waiting_on_person;
+        if (!person) return;
+        const group = grouped.get(person.id) || { person, todos: [] };
+        group.todos.push(todo);
+        grouped.set(person.id, group);
+      });
+    return [...grouped.values()]
+      .map((group) => ({ ...group, todos: sortTodos(group.todos) }))
+      .sort((left, right) => {
+        const leftTop = left.todos[0];
+        const rightTop = right.todos[0];
+        return sortTodos([leftTop, rightTop])[0].id === leftTop.id ? -1 : 1;
+      });
+  }, [visibleOpenTodos]);
+
+  const boardTodoCount = visibleOpenTodos.length;
+  const recentDoneCount = todos.filter((todo) => todo.status === "done" && isCompletedWithinWindow(todo, doneVisibilityDays)).length;
+  const olderDoneCount = todos.filter((todo) => todo.status === "done" && !isCompletedWithinWindow(todo, doneVisibilityDays)).length;
+  const selectedFilterCount = selectedTagIds.length
+    + (sourceFilter === "all" ? 0 : 1)
+    + (projectFilter === "all" ? 0 : 1)
+    + (reviewFilter === "all" ? 0 : 1);
+
+  async function createPerson(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) throw new Error("Person name is required.");
+    const data = await readJson(
+      await fetch("/api/todo-people", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: cleanName })
+      })
+    );
+    const person = data.person as TodoPerson;
+    setPeople((current) => {
+      const next = [...current.filter((item) => item.id !== person.id), person];
+      return next.sort((left, right) => left.name.localeCompare(right.name));
     });
-  }, [todos, selectedTagIds, statusFilter, sourceFilter, projectFilter, reviewFilter]);
+    return person;
+  }
+
+  async function persistTodoUpdate(todoId: number, updates: Partial<Todo> & { tag_ids?: number[]; waiting_on_person_id?: number | null }) {
+    const data = await readJson(
+      await fetch(`/api/todos/${todoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates)
+      })
+    );
+    const updated = data.todo as Todo;
+    setTodos((current) => [updated, ...current.filter((todo) => todo.id !== updated.id)]);
+    return updated;
+  }
 
   async function submitTodo(text: string, deadline?: string) {
     setIsSaving(true);
@@ -120,7 +249,8 @@ export function TodoManager() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: text,
-            deadline_text: deadline || null
+            deadline_text: deadline || null,
+            status: "inbox"
           })
         })
       );
@@ -129,7 +259,6 @@ export function TodoManager() {
       setPendingTodoText("");
       setDeadlineText("");
       await refresh();
-      window.setTimeout(refresh, 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -170,6 +299,7 @@ export function TodoManager() {
       );
       setTagName("");
       setTagDescription("");
+      setIsTagModalOpen(false);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -184,53 +314,18 @@ export function TodoManager() {
     setIsSaving(true);
     setError("");
     try {
-      await readJson(
-        await fetch(`/api/todos/${editingTodo.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: editingTodo.title,
-            notes: editingTodo.notes || "",
-            status: editingTodo.status,
-            priority: editingTodo.priority,
-            due_date: editingTodo.due_date || null,
-            project: editingTodo.project,
-            reviewed: editingTodo.reviewed,
-            tag_ids: editingTodo.tags.map((tag) => tag.id)
-          })
-        })
-      );
+      await persistTodoUpdate(editingTodo.id, {
+        title: editingTodo.title,
+        notes: editingTodo.notes || "",
+        status: editingTodo.status,
+        priority: editingTodo.priority,
+        due_date: editingTodo.due_date || null,
+        project: editingTodo.project,
+        reviewed: editingTodo.reviewed,
+        tag_ids: editingTodo.tags.map((tag) => tag.id),
+        waiting_on_person_id: editingTodo.status === "pending_on_others" ? editingTodo.waiting_on_person_id : null
+      });
       setEditingTodo(null);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function quickCreateTagAndAdd(todo: Todo) {
-    if (!quickTagName.trim()) return;
-    setIsSaving(true);
-    setError("");
-    try {
-      const tagData = await readJson(
-        await fetch("/api/todo-tags", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: quickTagName })
-        })
-      );
-      const existingNonOthers = todo.tags.filter((tag) => !isOthers(tag)).map((tag) => tag.id);
-      await readJson(
-        await fetch(`/api/todos/${todo.id}/retag`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tag_ids: [...existingNonOthers, tagData.tag.id] })
-        })
-      );
-      setQuickTagTodoId(null);
-      setQuickTagName("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -254,157 +349,337 @@ export function TodoManager() {
     });
   }
 
+  function updateEditWaitingPerson(personId: string) {
+    if (!editingTodo) return;
+    const normalizedId = personId ? Number(personId) : null;
+    const person = people.find((item) => item.id === normalizedId) || null;
+    setEditingTodo({
+      ...editingTodo,
+      waiting_on_person_id: normalizedId,
+      waiting_on_person: person ? { id: person.id, name: person.name } : null
+    });
+  }
+
+  async function moveTodo(todo: Todo, targetStatus: TodoStatus) {
+    if (targetStatus === "pending_on_others") {
+      setPendingPrompt({ todo, targetStatus });
+      setSelectedPersonId(todo.waiting_on_person_id ? String(todo.waiting_on_person_id) : "");
+      setNewPersonName("");
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      await persistTodoUpdate(todo.id, {
+        status: targetStatus,
+        waiting_on_person_id: null
+      });
+      if (editingTodo?.id === todo.id) {
+        setEditingTodo(null);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function confirmPendingPerson(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingPrompt) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      let personId = selectedPersonId ? Number(selectedPersonId) : null;
+      if (!personId && newPersonName.trim()) {
+        const person = await createPerson(newPersonName);
+        personId = person.id;
+      }
+      if (!personId) {
+        throw new Error("Select a person or add a new one.");
+      }
+      await persistTodoUpdate(pendingPrompt.todo.id, {
+        status: pendingPrompt.targetStatus,
+        waiting_on_person_id: personId
+      });
+      setPendingPrompt(null);
+      setSelectedPersonId("");
+      setNewPersonName("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleDragStart(todoId: number) {
+    setDraggingTodoId(todoId);
+  }
+
+  function handleDrop(column: BoardColumnKey) {
+    if (!draggingTodoId) return;
+    const todo = todos.find((item) => item.id === draggingTodoId);
+    setDraggingTodoId(null);
+    if (!todo) return;
+    const targetStatus = column === "triage" ? "inbox" : column;
+    if (todo.status === targetStatus || (column === "triage" && triageStatuses.includes(todo.status))) {
+      return;
+    }
+    void moveTodo(todo, targetStatus);
+  }
+
   return (
     <div className="todo-layout">
-      <section className="todo-main">
-        <form className="todo-capture" onSubmit={createTodo}>
+      <form className="todo-capture" onSubmit={createTodo}>
+        <div>
+          <p className="eyebrow">Capture</p>
+          <h2>Add todo</h2>
+        </div>
+        <label>
+          Todo
+          <textarea
+            value={todoText}
+            onChange={(event) => setTodoText(event.target.value)}
+            placeholder="Take followup from Aditya on VITyarthi data analysis by 16th June"
+            rows={5}
+          />
+        </label>
+        <button className="button primary" disabled={isSaving || !todoText.trim()} type="submit">
+          Add to triage
+        </button>
+      </form>
+
+      {error && <p className="error-banner">{error}</p>}
+
+      <section className="todo-list-section">
+        <div className="section-heading">
           <div>
-            <p className="eyebrow">Capture</p>
-            <h2>Add todo</h2>
+            <p className="eyebrow">Workflow</p>
+            <h2>{boardTodoCount} active</h2>
           </div>
-          <label>
-            Todo
-            <textarea
-              value={todoText}
-              onChange={(event) => setTodoText(event.target.value)}
-              placeholder="Take followup from Aditya on VITyarthi data analysis by 16th June"
-              rows={5}
-            />
-          </label>
-          <button className="button primary" disabled={isSaving || !todoText.trim()} type="submit">
-            Add todo
-          </button>
-        </form>
-
-        {error && <p className="error-banner">{error}</p>}
-
-        <section className="todo-list-section">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Todos</p>
-              <h2>{filteredTodos.length} visible</h2>
-            </div>
+          <div className="todo-view-switcher" role="tablist" aria-label="Todo views">
+            <button aria-selected={view === "board"} className={`tab ${view === "board" ? "active" : ""}`} onClick={() => setView("board")} role="tab" type="button">
+              Board
+            </button>
+            <button aria-selected={view === "followups"} className={`tab ${view === "followups" ? "active" : ""}`} onClick={() => setView("followups")} role="tab" type="button">
+              Follow-Ups
+            </button>
+            <button aria-selected={view === "history"} className={`tab ${view === "history" ? "active" : ""}`} onClick={() => setView("history")} role="tab" type="button">
+              Done History
+            </button>
           </div>
-          {isLoading ? (
-            <p className="muted">Loading todos...</p>
-          ) : filteredTodos.length === 0 ? (
-            <div className="empty-state">
-              <h2>No todos match</h2>
-              <p className="muted">Capture one or loosen the filters.</p>
-            </div>
-          ) : (
-            <div className="todo-list">
-              {filteredTodos.map((todo) => (
-                <article className="todo-item" key={todo.id}>
+        </div>
+
+        <div className="todo-toolbar">
+          <div className="todo-toolbar-filters">
+            <label>
+              Source
+              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | "email" | "manual")}>
+                <option value="all">all</option>
+                <option value="email">email</option>
+                <option value="manual">manual</option>
+              </select>
+            </label>
+            <label>
+              Project
+              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value as TodoProject | "all")}>
+                <option value="all">all</option>
+                {projects.map((item) => (
+                  <option key={item} value={item}>{label(item)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Review
+              <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as "all" | "unreviewed" | "reviewed")}>
+                <option value="all">all</option>
+                <option value="unreviewed">unreviewed</option>
+                <option value="reviewed">reviewed</option>
+              </select>
+            </label>
+          </div>
+          <div className="todo-toolbar-actions">
+            {selectedFilterCount > 0 && (
+              <button
+                className="button"
+                type="button"
+                onClick={() => {
+                  setSourceFilter("all");
+                  setProjectFilter("all");
+                  setReviewFilter("all");
+                  setSelectedTagIds([]);
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+            <button className="button" type="button" onClick={() => setIsTagModalOpen(true)}>
+              Create tag
+            </button>
+          </div>
+        </div>
+
+        <div className="filter-tags">
+          {tags.map((tag) => (
+            <label key={tag.id} className="check-row">
+              <input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleFilterTag(tag.id)} />
+              <span>{tag.name}</span>
+            </label>
+          ))}
+        </div>
+
+        {isLoading ? (
+          <p className="muted">Loading todos...</p>
+        ) : view === "board" ? (
+          <div className="kanban-board">
+            {boardColumns.map((column) => {
+              const columnTodos = visibleOpenTodos.filter((todo) => column.statuses.includes(todo.status));
+              return (
+                <section
+                  className="kanban-column"
+                  key={column.key}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => handleDrop(column.key)}
+                >
+                  <div className="kanban-column-header">
+                    <div>
+                      <h3>{column.title}</h3>
+                      <p className="muted">{columnTodos.length} items</p>
+                    </div>
+                  </div>
+                  <div className="kanban-column-body">
+                    {columnTodos.length === 0 ? (
+                      <div className="kanban-empty">No items here.</div>
+                    ) : (
+                      columnTodos.map((todo) => (
+                        <article
+                          className="todo-card"
+                          draggable
+                          key={todo.id}
+                          onDragStart={() => handleDragStart(todo.id)}
+                          onDragEnd={() => setDraggingTodoId(null)}
+                        >
+                          <div className="todo-card-header">
+                            <div className="todo-card-title">
+                              <h3>{todo.title}</h3>
+                              {todo.notes && <p className="muted">{todo.notes}</p>}
+                            </div>
+                            <button className="button todo-card-edit" onClick={() => setEditingTodo(todo)} type="button" aria-label={`Edit ${todo.title}`}>
+                              Update
+                            </button>
+                          </div>
+                          <div className="todo-meta-row">
+                            <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
+                            <span className="todo-status">{label(todo.status)}</span>
+                            <span className="todo-status">{label(todo.project)}</span>
+                            {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
+                            {todo.waiting_on_person && <span className="todo-status">Waiting on {todo.waiting_on_person.name}</span>}
+                          </div>
+                          <div className="tag-row">
+                            {todo.tags.map((tag) => (
+                              <span className={`tag-chip ${isOthers(tag) ? "tag-others" : ""}`} key={tag.id}>{tag.name}</span>
+                            ))}
+                          </div>
+                          <div className="todo-card-footer">
+                            <select
+                              aria-label={`Move ${todo.title}`}
+                              value={todo.status}
+                              onChange={(event) => void moveTodo(todo, event.target.value as TodoStatus)}
+                            >
+                              {statuses.map((status) => (
+                                <option key={status} value={status}>{label(status)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : view === "followups" ? (
+          <div className="followup-list">
+            {followupGroups.length === 0 ? (
+              <div className="empty-state">
+                <h2>No follow-ups pending</h2>
+                <p className="muted">Tasks waiting on other people will appear here.</p>
+              </div>
+            ) : (
+              followupGroups.map((group) => (
+                <section className="followup-person-card" key={group.person.id}>
                   <div className="todo-item-header">
                     <div>
-                      <h3>{todo.title}</h3>
-                      {todo.notes && <p className="muted">{todo.notes}</p>}
+                      <h3>{group.person.name}</h3>
+                      <p className="muted">{group.todos.length} waiting task{group.todos.length === 1 ? "" : "s"}</p>
                     </div>
-                    <button className="button" onClick={() => setEditingTodo(todo)}>Update</button>
                   </div>
-                  <div className="todo-meta-row">
-                    <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
-                    <span className="todo-status">{label(todo.status)}</span>
-                    <span className="todo-status">{label(todo.project)}</span>
-                    {todo.source === "email" && <span className="todo-status">email</span>}
-                    {todo.source === "email" && !todo.reviewed && <span className="todo-status">unreviewed</span>}
-                    {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
-                  </div>
-                  <div className="tag-row">
-                    {todo.tags.map((tag) => (
-                      <span className={`tag-chip ${isOthers(tag) ? "tag-others" : ""}`} key={tag.id}>{tag.name}</span>
+                  <div className="followup-task-list">
+                    {group.todos.map((todo) => (
+                      <article className="todo-item" key={todo.id}>
+                        <div className="todo-item-header">
+                          <div>
+                            <h3>{todo.title}</h3>
+                            {todo.notes && <p className="muted">{todo.notes}</p>}
+                          </div>
+                          <button className="button" onClick={() => setEditingTodo(todo)} type="button">Open</button>
+                        </div>
+                        <div className="todo-meta-row">
+                          <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
+                          <span className="todo-status">{label(todo.project)}</span>
+                          {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
+                        </div>
+                        <div className="followup-actions">
+                          <button className="button" onClick={() => void moveTodo(todo, "update_needed")} type="button">Need update</button>
+                          <button className="button" onClick={() => void moveTodo(todo, "wip")} type="button">Back to WIP</button>
+                          <button className="button primary" onClick={() => void moveTodo(todo, "done")} type="button">Mark done</button>
+                        </div>
+                      </article>
                     ))}
                   </div>
-                  {todo.tags.some(isOthers) && (
-                    <div className="quick-retag">
-                      {quickTagTodoId === todo.id ? (
-                        <>
-                          <input value={quickTagName} onChange={(event) => setQuickTagName(event.target.value)} placeholder="New tag name" />
-                          <button className="button primary" onClick={() => quickCreateTagAndAdd(todo)} disabled={isSaving || !quickTagName.trim()}>
-                            Create tag and add
-                          </button>
-                          <button className="text-button" onClick={() => setQuickTagTodoId(null)}>Cancel</button>
-                        </>
-                      ) : (
-                        <button className="button" onClick={() => setQuickTagTodoId(todo.id)}>Create tag and add to it</button>
-                      )}
-                    </div>
-                  )}
-                </article>
-              ))}
+                </section>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="history-panel">
+            <div className="history-toolbar">
+              <p className="muted">{recentDoneCount} completed in the last {doneVisibilityDays} days</p>
+              <button className="button" onClick={() => setShowOlderDone((current) => !current)} type="button">
+                {showOlderDone ? "Hide older done" : `Show older done (${olderDoneCount})`}
+              </button>
             </div>
-          )}
-        </section>
+            {historyTodos.length === 0 ? (
+              <div className="empty-state">
+                <h2>No completed tasks in view</h2>
+                <p className="muted">Recent completed work will appear here when you ask for it.</p>
+              </div>
+            ) : (
+              <div className="todo-list">
+                {historyTodos.map((todo) => (
+                  <article className="todo-item" key={todo.id}>
+                    <div className="todo-item-header">
+                      <div>
+                        <h3>{todo.title}</h3>
+                        {todo.notes && <p className="muted">{todo.notes}</p>}
+                      </div>
+                      <button className="button" onClick={() => setEditingTodo(todo)} type="button">Open</button>
+                    </div>
+                    <div className="todo-meta-row">
+                      <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
+                      <span className="todo-status">done</span>
+                      {todo.completed_at && <span className="todo-date">Completed {new Date(todo.completed_at).toLocaleDateString()}</span>}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
-
-      <aside className="todo-side">
-        <form className="side-panel" onSubmit={createTag}>
-          <div>
-            <p className="eyebrow">Tags</p>
-            <h2>Create tag</h2>
-          </div>
-          <label>
-            Name
-            <input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="VITyarthi" />
-          </label>
-          <label>
-            Description
-            <input value={tagDescription} onChange={(event) => setTagDescription(event.target.value)} placeholder="Optional matching hint" />
-          </label>
-          <button className="button" type="submit" disabled={isSaving || !tagName.trim()}>Create tag</button>
-        </form>
-
-        <section className="side-panel">
-          <div>
-            <p className="eyebrow">Filters</p>
-            <h2>Narrow list</h2>
-          </div>
-          <label>
-            Status
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TodoStatus | "open" | "all")}>
-              <option value="open">open</option>
-              <option value="all">all</option>
-              {statuses.map((item) => (
-                <option key={item} value={item}>{label(item)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Source
-            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | "email" | "manual")}>
-              <option value="all">all</option>
-              <option value="email">email</option>
-              <option value="manual">manual</option>
-            </select>
-          </label>
-          <label>
-            Project
-            <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value as TodoProject | "all")}>
-              <option value="all">all</option>
-              {projects.map((item) => (
-                <option key={item} value={item}>{label(item)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Review
-            <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as "all" | "unreviewed" | "reviewed")}>
-              <option value="all">all</option>
-              <option value="unreviewed">unreviewed</option>
-              <option value="reviewed">reviewed</option>
-            </select>
-          </label>
-          <div className="filter-tags">
-            {tags.map((tag) => (
-              <label key={tag.id} className="check-row">
-                <input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleFilterTag(tag.id)} />
-                <span>{tag.name}</span>
-              </label>
-            ))}
-          </div>
-        </section>
-      </aside>
 
       {pendingTodoText && (
         <div className="modal-backdrop" role="presentation" onClick={() => setPendingTodoText("")}>
@@ -433,10 +708,74 @@ export function TodoManager() {
             </label>
             <div className="modal-actions">
               <button className="button primary" type="submit" disabled={isSaving}>Add todo</button>
-              <button className="button" type="button" disabled={isSaving} onClick={() => submitTodo(pendingTodoText)}>
+              <button className="button" type="button" disabled={isSaving} onClick={() => void submitTodo(pendingTodoText)}>
                 No deadline
               </button>
             </div>
+          </form>
+        </div>
+      )}
+
+      {isTagModalOpen && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setIsTagModalOpen(false)}>
+          <form className="todo-edit-panel" role="dialog" aria-modal="true" onSubmit={createTag} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Tags</p>
+                <h2>Create tag</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setIsTagModalOpen(false)} aria-label="Close tag modal">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <label>
+              Name
+              <input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="VITyarthi" />
+            </label>
+            <label>
+              Description
+              <input value={tagDescription} onChange={(event) => setTagDescription(event.target.value)} placeholder="Optional matching hint" />
+            </label>
+            <button className="button primary" type="submit" disabled={isSaving || !tagName.trim()}>
+              Create tag
+            </button>
+          </form>
+        </div>
+      )}
+
+      {pendingPrompt && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingPrompt(null)}>
+          <form className="todo-edit-panel" role="dialog" aria-modal="true" onSubmit={confirmPendingPerson} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Waiting</p>
+                <h2>Who are you waiting on?</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setPendingPrompt(null)} aria-label="Close waiting prompt">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <p className="muted">{pendingPrompt.todo.title}</p>
+            <label>
+              Existing person
+              <select value={selectedPersonId} onChange={(event) => setSelectedPersonId(event.target.value)}>
+                <option value="">Select one</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Or add new person
+              <input value={newPersonName} onChange={(event) => setNewPersonName(event.target.value)} placeholder="Name" />
+            </label>
+            <button className="button primary" type="submit" disabled={isSaving}>Save waiting owner</button>
           </form>
         </div>
       )}
@@ -492,6 +831,17 @@ export function TodoManager() {
                 <span>reviewed</span>
               </label>
             </div>
+            {editingTodo.status === "pending_on_others" && (
+              <label>
+                Waiting on
+                <select value={editingTodo.waiting_on_person_id || ""} onChange={(event) => updateEditWaitingPerson(event.target.value)}>
+                  <option value="">Select one</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>{person.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label>
               Due date
               <input type="date" value={editingTodo.due_date || ""} onChange={(event) => setEditingTodo({ ...editingTodo, due_date: event.target.value || null })} />

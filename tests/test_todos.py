@@ -26,7 +26,7 @@ def test_create_todo_uses_llm_tag_ids(monkeypatch, tmp_path):
 
     assert todo["title"] == "Take followup from Aditya on VITyarthi data analysis"
     assert {tag["name"] for tag in todo["tags"]} == {"Work Delegation", "VITyarthi"}
-    assert todo["status"] == "idea"
+    assert todo["status"] == "inbox"
     assert todo["priority"] == "medium"
 
 
@@ -84,6 +84,56 @@ def test_filter_and_retag_todo(monkeypatch, tmp_path):
     assert [tag["name"] for tag in retagged["tags"]] == ["Personal"]
     assert todos.list_todos(tag_id=work["id"]) == []
     assert [item["id"] for item in todos.list_todos(tag_id=personal["id"])] == [retagged["id"]]
+
+
+def test_pending_on_others_requires_person(monkeypatch, tmp_path):
+    use_tmp_db(monkeypatch, tmp_path)
+
+    try:
+        todos.create_todo(title="Wait for vendor reply", status="pending_on_others", classify_tags=False)
+    except ValueError as exc:
+        assert "must have a person assigned" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError when pending todo has no person.")
+
+
+def test_pending_on_others_tracks_person_and_clears_on_move(monkeypatch, tmp_path):
+    use_tmp_db(monkeypatch, tmp_path)
+    person = todos.create_person("Aditya")
+    todo = todos.create_todo(
+        title="Wait for Aditya's numbers",
+        status="pending_on_others",
+        waiting_on_person_id=person["id"],
+        classify_tags=False,
+    )
+
+    assert todo["waiting_on_person"]["name"] == "Aditya"
+
+    updated = todos.update_todo(todo["id"], {"status": "wip"})
+
+    assert updated["status"] == "wip"
+    assert updated["waiting_on_person"] is None
+
+
+def test_done_sets_completed_at_and_reopen_clears_it(monkeypatch, tmp_path):
+    use_tmp_db(monkeypatch, tmp_path)
+    todo = todos.create_todo(title="Close the loop", classify_tags=False)
+
+    done = todos.update_todo(todo["id"], {"status": "done"})
+    assert done["completed_at"] is not None
+
+    reopened = todos.update_todo(todo["id"], {"status": "wip"})
+    assert reopened["completed_at"] is None
+
+
+def test_people_are_reused_by_normalized_name(monkeypatch, tmp_path):
+    use_tmp_db(monkeypatch, tmp_path)
+
+    first = todos.create_person("Aditya")
+    second = todos.create_person("  aditya  ")
+
+    assert first["id"] == second["id"]
+    assert [person["name"] for person in todos.list_people()] == ["aditya"]
 
 
 def test_reminder_digest_falls_back_when_llm_unavailable(monkeypatch, tmp_path):
