@@ -16,16 +16,23 @@ type Todo = {
   status: TodoStatus;
   priority: TodoPriority;
   due_date: string | null;
+  source: string;
+  source_ref_id: string | null;
+  project: TodoProject;
+  reviewed: boolean;
+  raw_context: string | null;
   created_at: string;
   updated_at: string;
   tags: TodoTag[];
 };
 
-type TodoStatus = "idea" | "need_to_plan" | "wip" | "update_needed" | "pending_on_others" | "done";
-type TodoPriority = "low" | "medium" | "high";
+type TodoStatus = "inbox" | "idea" | "need_to_plan" | "wip" | "update_needed" | "pending_on_others" | "done";
+type TodoPriority = "low" | "medium" | "high" | "urgent";
+type TodoProject = "vitbhopal" | "vityarthi" | "recruitment" | "personal" | "unknown";
 
-const statuses: TodoStatus[] = ["idea", "need_to_plan", "wip", "update_needed", "pending_on_others", "done"];
-const priorities: TodoPriority[] = ["low", "medium", "high"];
+const statuses: TodoStatus[] = ["inbox", "idea", "need_to_plan", "wip", "update_needed", "pending_on_others", "done"];
+const priorities: TodoPriority[] = ["low", "medium", "high", "urgent"];
+const projects: TodoProject[] = ["unknown", "vitbhopal", "vityarthi", "recruitment", "personal"];
 
 function label(value: string) {
   return value.replace(/_/g, " ");
@@ -52,6 +59,9 @@ export function TodoManager() {
   const [tags, setTags] = useState<TodoTag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState<TodoStatus | "open" | "all">("open");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "email" | "manual">("all");
+  const [projectFilter, setProjectFilter] = useState<TodoProject | "all">("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "unreviewed" | "reviewed">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -88,13 +98,17 @@ export function TodoManager() {
     return todos.filter((todo) => {
       if (statusFilter === "open" && todo.status === "done") return false;
       if (statusFilter !== "open" && statusFilter !== "all" && todo.status !== statusFilter) return false;
+      if (sourceFilter !== "all" && todo.source !== sourceFilter) return false;
+      if (projectFilter !== "all" && todo.project !== projectFilter) return false;
+      if (reviewFilter === "unreviewed" && todo.reviewed) return false;
+      if (reviewFilter === "reviewed" && !todo.reviewed) return false;
       if (selectedTagIds.length > 0) {
         const todoTagIds = new Set(todo.tags.map((tag) => tag.id));
         return selectedTagIds.every((tagId) => todoTagIds.has(tagId));
       }
       return true;
     });
-  }, [todos, selectedTagIds, statusFilter]);
+  }, [todos, selectedTagIds, statusFilter, sourceFilter, projectFilter, reviewFilter]);
 
   async function submitTodo(text: string, deadline?: string) {
     setIsSaving(true);
@@ -180,6 +194,8 @@ export function TodoManager() {
             status: editingTodo.status,
             priority: editingTodo.priority,
             due_date: editingTodo.due_date || null,
+            project: editingTodo.project,
+            reviewed: editingTodo.reviewed,
             tag_ids: editingTodo.tags.map((tag) => tag.id)
           })
         })
@@ -290,6 +306,9 @@ export function TodoManager() {
                   <div className="todo-meta-row">
                     <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
                     <span className="todo-status">{label(todo.status)}</span>
+                    <span className="todo-status">{label(todo.project)}</span>
+                    {todo.source === "email" && <span className="todo-status">email</span>}
+                    {todo.source === "email" && !todo.reviewed && <span className="todo-status">unreviewed</span>}
                     {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
                   </div>
                   <div className="tag-row">
@@ -349,6 +368,31 @@ export function TodoManager() {
               {statuses.map((item) => (
                 <option key={item} value={item}>{label(item)}</option>
               ))}
+            </select>
+          </label>
+          <label>
+            Source
+            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | "email" | "manual")}>
+              <option value="all">all</option>
+              <option value="email">email</option>
+              <option value="manual">manual</option>
+            </select>
+          </label>
+          <label>
+            Project
+            <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value as TodoProject | "all")}>
+              <option value="all">all</option>
+              {projects.map((item) => (
+                <option key={item} value={item}>{label(item)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Review
+            <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as "all" | "unreviewed" | "reviewed")}>
+              <option value="all">all</option>
+              <option value="unreviewed">unreviewed</option>
+              <option value="reviewed">reviewed</option>
             </select>
           </label>
           <div className="filter-tags">
@@ -432,6 +476,20 @@ export function TodoManager() {
                     <option key={item} value={item}>{label(item)}</option>
                   ))}
                 </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                Project
+                <select value={editingTodo.project} onChange={(event) => setEditingTodo({ ...editingTodo, project: event.target.value as TodoProject })}>
+                  {projects.map((item) => (
+                    <option key={item} value={item}>{label(item)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="check-row form-check-row">
+                <input type="checkbox" checked={editingTodo.reviewed} onChange={(event) => setEditingTodo({ ...editingTodo, reviewed: event.target.checked })} />
+                <span>reviewed</span>
               </label>
             </div>
             <label>

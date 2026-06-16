@@ -13,6 +13,7 @@ from marvin_core.openrouter import OpenRouterClient
 DATABASE_PATH = "data/marvin.sqlite3"
 DEFAULT_TAG_NAME = "Others"
 TODO_STATUSES = {
+    "inbox",
     "idea",
     "need_to_plan",
     "wip",
@@ -20,8 +21,9 @@ TODO_STATUSES = {
     "pending_on_others",
     "done",
 }
-TODO_PRIORITIES = {"low", "medium", "high"}
+TODO_PRIORITIES = {"low", "medium", "high", "urgent"}
 OPEN_STATUSES = TODO_STATUSES - {"done"}
+TODO_PROJECTS = {"vitbhopal", "vityarthi", "recruitment", "personal", "unknown"}
 TOKEN_STOPWORDS = {
     "a",
     "an",
@@ -102,6 +104,11 @@ def _row_to_todo(row: sqlite3.Row, tags: list[dict[str, Any]]) -> dict[str, Any]
         "status": row["status"],
         "priority": row["priority"],
         "due_date": row["due_date"],
+        "source": row["source"],
+        "source_ref_id": row["source_ref_id"],
+        "project": row["project"],
+        "reviewed": bool(row["reviewed"]),
+        "raw_context": row["raw_context"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "tags": tags,
@@ -119,6 +126,13 @@ def _validate_priority(priority: str | None, *, default: str = "medium") -> str:
     value = (priority or default).strip().lower()
     if value not in TODO_PRIORITIES:
         raise ValueError(f"Invalid todo priority: {priority}")
+    return value
+
+
+def _validate_project(project: str | None, *, default: str = "unknown") -> str:
+    value = (project or default).strip().lower()
+    if value not in TODO_PROJECTS:
+        raise ValueError(f"Invalid todo project: {project}")
     return value
 
 
@@ -370,6 +384,10 @@ def list_todos(
     status: str | None = None,
     tag_id: int | None = None,
     include_done: bool = False,
+    source: str | None = None,
+    project: str | None = None,
+    priority: str | None = None,
+    reviewed: bool | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict[str, Any]]:
     owns_conn = conn is None
@@ -387,6 +405,18 @@ def list_todos(
                 "EXISTS (SELECT 1 FROM todo_tag_links WHERE todo_tag_links.todo_id = todos.id AND todo_tag_links.tag_id = ?)"
             )
             params.append(tag_id)
+        if source:
+            clauses.append("todos.source = ?")
+            params.append(source.strip().lower())
+        if project:
+            clauses.append("todos.project = ?")
+            params.append(_validate_project(project))
+        if priority:
+            clauses.append("todos.priority = ?")
+            params.append(_validate_priority(priority))
+        if reviewed is not None:
+            clauses.append("todos.reviewed = ?")
+            params.append(1 if reviewed else 0)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = conn.execute(
             f"""
@@ -394,7 +424,7 @@ def list_todos(
             FROM todos
             {where}
             ORDER BY
-                CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+                CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
                 CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
                 due_date ASC,
                 updated_at DESC
@@ -422,6 +452,11 @@ def create_todo(
     deadline_text: str | None = None,
     tag_ids: list[int] | None = None,
     classify_tags: bool = True,
+    source: str | None = None,
+    source_ref_id: str | None = None,
+    project: str | None = None,
+    reviewed: bool | None = None,
+    raw_context: str | None = None,
 ) -> dict[str, Any]:
     clean_title = re.sub(r"\s+", " ", title.strip())
     if not clean_title:
@@ -446,8 +481,9 @@ def create_todo(
         now = _now()
         cursor = conn.execute(
             """
-            INSERT INTO todos (title, notes, status, priority, due_date, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO todos
+                (title, notes, status, priority, due_date, source, source_ref_id, project, reviewed, raw_context, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 clean_title,
@@ -455,6 +491,11 @@ def create_todo(
                 _validate_status(status),
                 _validate_priority(priority),
                 parsed_due_date,
+                (source or "manual").strip().lower(),
+                source_ref_id or None,
+                _validate_project(project),
+                1 if reviewed is not False else 0,
+                raw_context or None,
                 now,
                 now,
             ),
@@ -501,7 +542,19 @@ def classify_and_apply_tags(todo_id: int) -> dict[str, Any] | None:
 
 
 def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
-    allowed = {"title", "notes", "status", "priority", "due_date", "tag_ids"}
+    allowed = {
+        "title",
+        "notes",
+        "status",
+        "priority",
+        "due_date",
+        "tag_ids",
+        "source",
+        "source_ref_id",
+        "project",
+        "reviewed",
+        "raw_context",
+    }
     unknown = set(updates) - allowed
     if unknown:
         raise ValueError(f"Unsupported todo fields: {', '.join(sorted(unknown))}")
@@ -531,6 +584,21 @@ def update_todo(todo_id: int, updates: dict[str, Any]) -> dict[str, Any]:
         if "due_date" in updates:
             fields.append("due_date = ?")
             params.append(_validate_due_date(updates["due_date"]))
+        if "source" in updates:
+            fields.append("source = ?")
+            params.append(str(updates["source"] or "manual").strip().lower())
+        if "source_ref_id" in updates:
+            fields.append("source_ref_id = ?")
+            params.append(updates["source_ref_id"] or None)
+        if "project" in updates:
+            fields.append("project = ?")
+            params.append(_validate_project(updates["project"]))
+        if "reviewed" in updates:
+            fields.append("reviewed = ?")
+            params.append(1 if updates["reviewed"] else 0)
+        if "raw_context" in updates:
+            fields.append("raw_context = ?")
+            params.append(updates["raw_context"] or None)
         if fields:
             fields.append("updated_at = ?")
             params.append(_now())

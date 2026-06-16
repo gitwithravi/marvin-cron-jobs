@@ -2376,6 +2376,11 @@ label {
   color: var(--danger);
 }
 
+.priority-urgent {
+  background: #5f211b;
+  color: #fff;
+}
+
 .priority-medium {
   background: #f3ead9;
   color: var(--warning);
@@ -2407,6 +2412,170 @@ label {
   gap: 7px;
   min-height: 34px;
   padding: 6px 10px;
+}
+
+.form-check-row {
+  align-self: end;
+  justify-content: start;
+}
+
+.email-capture-layout {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.15fr);
+}
+
+.email-capture-list-panel,
+.email-capture-detail-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.email-capture-list {
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 210px);
+  overflow: auto;
+}
+
+.email-capture-row {
+  background: #f2f5f4;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px;
+  text-align: left;
+}
+
+.email-capture-row.selected,
+.email-capture-row:hover {
+  border-color: var(--accent);
+}
+
+.email-capture-row strong,
+.email-capture-row span,
+.email-capture-row small {
+  overflow-wrap: anywhere;
+}
+
+.email-capture-row span,
+.email-capture-row small {
+  color: var(--muted);
+}
+
+.capture-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-self: start;
+  min-height: 24px;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.capture-status-task_created {
+  background: #e5f0e9;
+  color: var(--success);
+}
+
+.capture-status-duplicate {
+  background: #f3ead9;
+  color: var(--warning);
+}
+
+.capture-status-rejected,
+.capture-status-failed {
+  background: #f8e9e6;
+  color: var(--danger);
+}
+
+.capture-status-received,
+.capture-status-parsed {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.capture-detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.capture-detail-grid div {
+  background: #f2f5f4;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.capture-detail-grid dt {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.capture-detail-grid dd {
+  font-weight: 700;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.capture-preview,
+.capture-events {
+  display: grid;
+  gap: 10px;
+}
+
+.capture-preview h3,
+.capture-events h3 {
+  margin: 0;
+}
+
+.capture-preview pre {
+  background: #11191d;
+  border-radius: 6px;
+  color: #e8f0ed;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+.capture-events div {
+  align-items: center;
+  background: #f2f5f4;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.capture-events span {
+  font-weight: 800;
+}
+
+.capture-events small {
+  color: var(--muted);
 }
 
 .check-row input {
@@ -2655,7 +2824,8 @@ label {
 
 @media (max-width: 900px) {
   .app-shell,
-  .todo-layout {
+  .todo-layout,
+  .email-capture-layout {
     grid-template-columns: 1fr;
   }
 

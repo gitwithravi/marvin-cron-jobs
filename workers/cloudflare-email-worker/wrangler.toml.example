@@ -1,0 +1,7 @@
+name = "marvin-email-capture"
+main = "src/index.ts"
+compatibility_date = "2026-06-16"
+
+[vars]
+MARVIN_API_BASE_URL = "https://tasks.vitbhopal.dev"
+MARVIN_EMAIL_CAPTURE_SECRET = "replace-with-shared-secret"

@@ -8,7 +8,7 @@ from collections import Counter
 import base64
 import uvicorn
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from requests import RequestException
 import importlib
@@ -33,6 +33,12 @@ from marvin_core.agent import process_message, execute_task, read_report, format
 from marvin_core.alerts import generate_alert, read_latest_alert
 from marvin_core.beszel_live import fetch_beszel_live_payload
 from marvin_core.env import load_root_env, require_env
+from marvin_core.email_capture import (
+    EmailCaptureError,
+    get_email_capture,
+    list_email_captures,
+    process_email_capture,
+)
 from marvin_core.config import load_yaml
 from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
 from marvin_core.invoices import create_invoice_draft, list_invoices, save_invoice
@@ -90,6 +96,11 @@ class TodoCreateRequest(BaseModel):
     due_date: str | None = None
     deadline_text: str | None = None
     tag_ids: list[int] | None = None
+    source: str | None = None
+    source_ref_id: str | None = None
+    project: str | None = None
+    reviewed: bool | None = None
+    raw_context: str | None = None
 
 
 class TodoUpdateRequest(BaseModel):
@@ -99,6 +110,11 @@ class TodoUpdateRequest(BaseModel):
     priority: str | None = None
     due_date: str | None = None
     tag_ids: list[int] | None = None
+    source: str | None = None
+    source_ref_id: str | None = None
+    project: str | None = None
+    reviewed: bool | None = None
+    raw_context: str | None = None
 
 
 class TodoRetagRequest(BaseModel):
@@ -301,11 +317,65 @@ def create_todo_tag_endpoint(payload: TagCreateRequest):
 
 
 @app.get("/todos")
-def todos_endpoint(status: str | None = None, tag_id: int | None = None, include_done: bool = False):
+def todos_endpoint(
+    status: str | None = None,
+    tag_id: int | None = None,
+    include_done: bool = False,
+    source: str | None = None,
+    project: str | None = None,
+    priority: str | None = None,
+    reviewed: bool | None = None,
+):
     try:
-        return {"todos": list_todos(status=status, tag_id=tag_id, include_done=include_done)}
+        return {
+            "todos": list_todos(
+                status=status,
+                tag_id=tag_id,
+                include_done=include_done,
+                source=source,
+                project=project,
+                priority=priority,
+                reviewed=reviewed,
+            )
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/email-captures")
+def email_captures_endpoint(limit: int = 50):
+    try:
+        return {"captures": list_email_captures(limit=limit)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/email-captures/{capture_id}")
+def email_capture_detail_endpoint(capture_id: str):
+    try:
+        capture = get_email_capture(capture_id)
+        if not capture:
+            raise HTTPException(status_code=404, detail="Email capture not found.")
+        return {"capture": capture}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/email-capture")
+def email_capture_endpoint(payload: dict[str, Any], x_marvin_email_secret: str | None = Header(default=None)):
+    expected = os.getenv("MARVIN_EMAIL_CAPTURE_SECRET")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Email capture is not configured.")
+    if x_marvin_email_secret != expected:
+        raise HTTPException(status_code=401, detail="Invalid email capture secret.")
+    try:
+        return process_email_capture(payload)
+    except EmailCaptureError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -547,6 +617,11 @@ def create_todo_endpoint(payload: TodoCreateRequest, background_tasks: Backgroun
             deadline_text=payload.deadline_text,
             tag_ids=payload.tag_ids,
             classify_tags=payload.tag_ids is not None,
+            source=payload.source,
+            source_ref_id=payload.source_ref_id,
+            project=payload.project,
+            reviewed=payload.reviewed,
+            raw_context=payload.raw_context,
         )
         if payload.tag_ids is None:
             background_tasks.add_task(classify_and_apply_tags, todo["id"])

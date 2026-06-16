@@ -143,6 +143,11 @@ CREATE TABLE IF NOT EXISTS todos (
     status TEXT NOT NULL,
     priority TEXT NOT NULL,
     due_date TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    source_ref_id TEXT,
+    project TEXT NOT NULL DEFAULT 'unknown',
+    reviewed INTEGER NOT NULL DEFAULT 1,
+    raw_context TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -251,6 +256,46 @@ CREATE TABLE IF NOT EXISTS support_rag_suggestions (
     sent_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS email_captures (
+    id TEXT PRIMARY KEY,
+    message_id TEXT,
+    from_email TEXT NOT NULL,
+    to_email TEXT NOT NULL,
+    subject TEXT,
+    received_at TEXT NOT NULL,
+    raw_email_path TEXT,
+    text_body TEXT,
+    html_body TEXT,
+    body_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'received',
+    error_message TEXT,
+    created_task_id INTEGER,
+    notification_status TEXT,
+    notification_error TEXT,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (created_task_id) REFERENCES todos(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_captures_message_id
+    ON email_captures(message_id);
+
+CREATE INDEX IF NOT EXISTS idx_email_captures_body_hash
+    ON email_captures(body_hash);
+
+CREATE INDEX IF NOT EXISTS idx_email_captures_sender_subject
+    ON email_captures(from_email, subject, received_at);
+
+CREATE TABLE IF NOT EXISTS email_capture_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email_capture_id TEXT,
+    event_name TEXT NOT NULL,
+    event_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (email_capture_id) REFERENCES email_captures(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_task_run_payloads_task_name_observed
     ON task_run_payloads(task_name, observed_at);
 
@@ -268,6 +313,9 @@ CREATE INDEX IF NOT EXISTS idx_support_rag_suggestions_ticket_status
 
 CREATE INDEX IF NOT EXISTS idx_support_rag_suggestions_updated
     ON support_rag_suggestions(updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_email_capture_events_capture
+    ON email_capture_events(email_capture_id, created_at);
 """
 
 
@@ -318,6 +366,11 @@ MIGRATIONS = [
     ("beszel_alert_observations_min_value", "ALTER TABLE beszel_alert_observations ADD COLUMN min_value TEXT"),
     ("reimbursement_invoices_invoice_file_path", "ALTER TABLE reimbursement_invoices ADD COLUMN invoice_file_path TEXT"),
     ("reimbursement_invoices_invoice_file_url", "ALTER TABLE reimbursement_invoices ADD COLUMN invoice_file_url TEXT"),
+    ("todos_source", "ALTER TABLE todos ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'"),
+    ("todos_source_ref_id", "ALTER TABLE todos ADD COLUMN source_ref_id TEXT"),
+    ("todos_project", "ALTER TABLE todos ADD COLUMN project TEXT NOT NULL DEFAULT 'unknown'"),
+    ("todos_reviewed", "ALTER TABLE todos ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1"),
+    ("todos_raw_context", "ALTER TABLE todos ADD COLUMN raw_context TEXT"),
 ]
 
 
@@ -353,6 +406,16 @@ def run_migrations(conn: sqlite3.Connection) -> None:
             WHERE invoice_file_url IS NULL
             """
         )
+    todo_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(todos)").fetchall()
+    }
+    if "source" in todo_columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_source ON todos(source)")
+    if "project" in todo_columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_project ON todos(project)")
+    if "reviewed" in todo_columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_todos_reviewed ON todos(reviewed)")
     conn.commit()
 
 
