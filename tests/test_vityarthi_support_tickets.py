@@ -16,6 +16,7 @@ from tasks.vityarthi_support_tickets.analysis import (
 from tasks.vityarthi_support_tickets.vityarthi import (
     normalize_ticket,
     normalize_ticket_detail,
+    normalize_reply,
 )
 
 
@@ -56,6 +57,20 @@ class TestNormalizeTicket:
 
 
 class TestNormalizeTicketDetail:
+    def test_normalize_reply_uses_owner_id_for_customer_role(self):
+        result = normalize_reply(
+            {"id": 1, "user_id": 44, "message": "Help"},
+            owner_id=44,
+        )
+        assert result["role"] == "customer"
+
+    def test_normalize_reply_maps_admin_to_staff(self):
+        result = normalize_reply(
+            {"id": 1, "message": "Done", "user": {"id": 1, "role": "admin"}},
+            owner_id=44,
+        )
+        assert result["role"] == "staff"
+
     def test_normalize_ticket_detail_counts_replies_and_attachments(self):
         detail = {
             "id": 10,
@@ -358,3 +373,23 @@ class TestVityarthiClient:
         assert tickets[0]["id"] == 959
         assert tickets[0]["subject"] == "Python Essentials Certificate"
         assert tickets[0]["owner_name"] == "Divyanshu"
+
+    def test_post_ticket_reply_posts_message(self):
+        from tasks.vityarthi_support_tickets.vityarthi import VityarthiSupportClient
+
+        client = VityarthiSupportClient("https://example.com", "fake-token")
+
+        with patch.object(client.session, "post") as mock_post:
+            resp = MagicMock()
+            resp.json.return_value = {"success": True, "data": {"id": 5, "message": "Sent"}}
+            resp.raise_for_status.return_value = None
+            mock_post.return_value = resp
+
+            result = client.post_ticket_reply(99, "Approved reply")
+
+        mock_post.assert_called_once_with(
+            "https://example.com/api/v1/system/support/tickets/99/replies",
+            json={"message": "Approved reply"},
+            timeout=30,
+        )
+        assert result == {"id": 5, "message": "Sent"}

@@ -13,7 +13,15 @@ from pydantic import BaseModel
 from requests import RequestException
 import importlib
 import json
-from marvin_core.db import connect, insert_marvin_summary
+from marvin_core.db import (
+    connect,
+    get_support_rag_suggestion,
+    insert_marvin_summary,
+    insert_support_rag_suggestion,
+    list_latest_support_rag_suggestions,
+    migrate,
+    update_support_rag_suggestion,
+)
 from marvin_core.communication_style import load_communication_style
 from marvin_core.openrouter import OpenRouterClient
 
@@ -28,6 +36,12 @@ from marvin_core.env import load_root_env, require_env
 from marvin_core.config import load_yaml
 from marvin_core.hermes import HermesClientError, HermesConfigError, chat_with_hermes
 from marvin_core.invoices import create_invoice_draft, list_invoices, save_invoice
+from marvin_core.support_rag import (
+    SupportRagEngine,
+    build_ticket_query,
+    index_support_kb,
+    utc_now_iso,
+)
 from marvin_core.todos import (
     classify_and_apply_tags,
     create_tag,
@@ -39,6 +53,7 @@ from marvin_core.todos import (
 )
 from tasks.team_status_today.client import TeamStatusAPIError, TeamStatusClient, _validate_date
 from tasks.team_status_today.run import _require_real_env
+from tasks.vityarthi_support_tickets.vityarthi import VityarthiSupportClient
 
 load_root_env()
 
@@ -113,6 +128,44 @@ class InvoiceExtractRequest(BaseModel):
     pdf_base64: str
 
 
+class SupportRagReplyMessage(BaseModel):
+    id: int | str | None = None
+    role: str | None = None
+    user_id: int | str | None = None
+    user_name: str | None = None
+    message: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class SupportRagSuggestRequest(BaseModel):
+    ticket_id: int
+    ticket_number: str | None = None
+    subject: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    category: str | None = None
+    message: str | None = None
+    owner_name: str | None = None
+    owner_email: str | None = None
+    replies: list[SupportRagReplyMessage] | None = None
+
+
+class SupportRagSendRequest(BaseModel):
+    suggestion_id: int
+    ticket_id: int
+    reply: str
+
+
+class SupportRagReviewRequest(BaseModel):
+    suggestion_id: int
+    status: Literal["ignored", "reviewed"]
+
+
+class SupportRagIndexRequest(BaseModel):
+    use_qdrant: bool = True
+
+
 def _database_path_for_task(task_name: str | None = None) -> str:
     if task_name:
         config_path = ROOT_DIR / "tasks" / task_name / "config.yaml"
@@ -121,6 +174,17 @@ def _database_path_for_task(task_name: str | None = None) -> str:
             if config.get("database_path"):
                 return str(config["database_path"])
     return os.getenv("MARVIN_DATABASE_PATH", "data/marvin.sqlite3")
+
+
+def _vityarthi_client() -> VityarthiSupportClient:
+    config = load_yaml(ROOT_DIR / "tasks" / "vityarthi_support_tickets" / "config.yaml")
+    base_url = config.get("base_url") or "https://admin.vityarthi.com"
+    api_token = require_env("VITYARTHI_SYSTEM_API_TOKEN")
+    return VityarthiSupportClient(base_url, api_token)
+
+
+def _support_rag_database_path() -> str:
+    return _database_path_for_task("vityarthi_support_tickets")
 
 
 def build_team_status_payload(date: str) -> dict[str, Any]:
@@ -307,6 +371,166 @@ def beszel_endpoint():
         raise HTTPException(status_code=502, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/support-rag/tickets")
+def support_rag_tickets_endpoint(statuses: str = "open,replied", limit: int = 25):
+    try:
+        clean_statuses = tuple(
+            status.strip()
+            for status in statuses.split(",")
+            if status.strip()
+        ) or ("open", "replied")
+        client = _vityarthi_client()
+        try:
+            tickets = client.fetch_review_tickets(
+                statuses=clean_statuses,
+                per_page=max(1, min(limit, 100)),
+                include_details=True,
+            )
+        finally:
+            client.close()
+
+        ticket_ids = [
+            int(ticket["id"])
+            for ticket in tickets
+            if ticket.get("id") is not None
+        ]
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            latest_suggestions = list_latest_support_rag_suggestions(conn, ticket_ids=ticket_ids)
+
+        enriched = []
+        for ticket in tickets:
+            ticket_id = int(ticket["id"]) if ticket.get("id") is not None else None
+            enriched.append(
+                {
+                    **ticket,
+                    "latest_suggestion": latest_suggestions.get(ticket_id) if ticket_id is not None else None,
+                }
+            )
+        return {"tickets": enriched}
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/support-rag/suggest")
+def support_rag_suggest_endpoint(payload: SupportRagSuggestRequest):
+    try:
+        ticket = payload.model_dump()
+        if not ticket.get("subject") and not ticket.get("message"):
+            client = _vityarthi_client()
+            try:
+                fetched = client.fetch_ticket_detail(payload.ticket_id)
+            finally:
+                client.close()
+            if not fetched:
+                raise HTTPException(status_code=404, detail=f"Ticket {payload.ticket_id} not found")
+            ticket = fetched
+
+        engine = SupportRagEngine()
+        suggestion = engine.suggest(ticket)
+        now = utc_now_iso()
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            stored = insert_support_rag_suggestion(
+                conn,
+                ticket_id=int(payload.ticket_id),
+                ticket_number=ticket.get("ticket_number"),
+                subject=ticket.get("subject"),
+                customer_message=build_ticket_query(ticket),
+                suggested_reply=suggestion.suggested_reply,
+                confidence=suggestion.confidence,
+                requires_human_attention=suggestion.requires_human_attention,
+                retrieval_backend=suggestion.retrieval_backend,
+                matched_examples=suggestion.matched_examples,
+                policy_flags=suggestion.policy_flags,
+                source={"ticket": ticket, "generated_at": now},
+                created_at=now,
+            )
+        return {"suggestion": stored}
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/support-rag/send")
+def support_rag_send_endpoint(payload: SupportRagSendRequest):
+    reply = payload.reply.strip()
+    if not reply:
+        raise HTTPException(status_code=400, detail="Reply cannot be empty")
+
+    try:
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            suggestion = get_support_rag_suggestion(conn, payload.suggestion_id)
+            if suggestion is None:
+                raise HTTPException(status_code=404, detail=f"Suggestion {payload.suggestion_id} not found")
+
+        client = _vityarthi_client()
+        try:
+            upstream = client.post_ticket_reply(payload.ticket_id, reply)
+        finally:
+            client.close()
+
+        now = utc_now_iso()
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            updated = update_support_rag_suggestion(
+                conn,
+                suggestion_id=payload.suggestion_id,
+                status="sent",
+                final_reply=reply,
+                sent_at=now,
+                updated_at=now,
+            )
+        return {"suggestion": updated, "upstream": upstream}
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/support-rag/review")
+def support_rag_review_endpoint(payload: SupportRagReviewRequest):
+    try:
+        now = utc_now_iso()
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            updated = update_support_rag_suggestion(
+                conn,
+                suggestion_id=payload.suggestion_id,
+                status=payload.status,
+                updated_at=now,
+            )
+        return {"suggestion": updated}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/support-rag/index")
+def support_rag_index_endpoint(payload: SupportRagIndexRequest):
+    try:
+        return index_support_kb(use_qdrant=payload.use_qdrant)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

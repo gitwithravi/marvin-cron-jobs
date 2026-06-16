@@ -88,6 +88,12 @@ TEAM_STATUS_API_KEY=your-api-key-here
 
 VITYARTHI_SYSTEM_API_TOKEN=your-vityarthi-system-api-token-here
 
+SUPPORT_RAG_MODEL=google/gemini-2.5-flash
+SUPPORT_RAG_QDRANT_PATH=data/qdrant_support_rag
+SUPPORT_RAG_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+SUPPORT_RAG_TEMPERATURE=0.2
+SUPPORT_RAG_MAX_TOKENS=700
+
 TELEGRAM_BOT_TOKEN=123456789:AA_REPLACE_WITH_BOTFATHER_TOKEN
 TELEGRAM_CHAT_ID=123456789
 
@@ -261,6 +267,17 @@ python -m tasks.vityarthi_support_tickets.run
 python -m tasks.vityarthi_support_tickets.run --dry-run
 ```
 
+### VITyarthi Support RAG
+
+Builds a local reply-suggestion index from CSV exports in `kb/`, then serves generated drafts in the dashboard Support queue. Drafts can be edited, copied, ignored, or sent through the VITyarthi system API after manual approval.
+
+```bash
+python tools/index_support_rag.py
+python tools/index_support_rag.py --no-qdrant
+```
+
+Qdrant/FastEmbed are the preferred local retrieval stack. If Qdrant is unavailable, MARVIN uses the JSONL fallback index at `data/support_rag_examples.jsonl`.
+
 ## MARVIN API And Dashboard APIs
 
 The Python MARVIN API exposes local-only endpoints used by the dashboard:
@@ -272,6 +289,8 @@ The Python MARVIN API exposes local-only endpoints used by the dashboard:
 - `GET /todo-tags`, `POST /todo-tags`: tag operations.
 - `GET /team-status?date=YYYY-MM-DD`: live team status board payload.
 - `GET /alerts/latest`, `POST /alerts/refresh`: alert display and refresh.
+- `GET /support-rag/tickets`, `POST /support-rag/suggest`, `POST /support-rag/send`: support reply review queue.
+- `POST /support-rag/index`: rebuild support RAG indexes from `kb/`.
 
 The dashboard wraps these with authenticated `/api/*` routes. Unauthenticated requests return `401`.
 

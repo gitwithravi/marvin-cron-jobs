@@ -231,6 +231,26 @@ CREATE TABLE IF NOT EXISTS marvin_summaries (
     FOREIGN KEY (run_id) REFERENCES task_runs(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS support_rag_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    ticket_number TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    subject TEXT,
+    customer_message TEXT,
+    suggested_reply TEXT NOT NULL,
+    final_reply TEXT,
+    confidence TEXT NOT NULL,
+    requires_human_attention INTEGER NOT NULL DEFAULT 1,
+    retrieval_backend TEXT,
+    matched_examples_json TEXT NOT NULL,
+    policy_flags_json TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    sent_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_task_run_payloads_task_name_observed
     ON task_run_payloads(task_name, observed_at);
 
@@ -242,6 +262,12 @@ CREATE INDEX IF NOT EXISTS idx_task_runs_task_name
 
 CREATE INDEX IF NOT EXISTS idx_task_runs_status
     ON task_runs(status);
+
+CREATE INDEX IF NOT EXISTS idx_support_rag_suggestions_ticket_status
+    ON support_rag_suggestions(ticket_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_support_rag_suggestions_updated
+    ON support_rag_suggestions(updated_at);
 """
 
 
@@ -661,3 +687,161 @@ def insert_marvin_summary(
         ),
     )
     conn.commit()
+
+
+def _support_suggestion_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "ticket_id": row["ticket_id"],
+        "ticket_number": row["ticket_number"],
+        "status": row["status"],
+        "subject": row["subject"],
+        "customer_message": row["customer_message"],
+        "suggested_reply": row["suggested_reply"],
+        "final_reply": row["final_reply"],
+        "confidence": row["confidence"],
+        "requires_human_attention": bool(row["requires_human_attention"]),
+        "retrieval_backend": row["retrieval_backend"],
+        "matched_examples": json.loads(row["matched_examples_json"]),
+        "policy_flags": json.loads(row["policy_flags_json"]),
+        "source": json.loads(row["source_json"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "sent_at": row["sent_at"],
+    }
+
+
+def insert_support_rag_suggestion(
+    conn: sqlite3.Connection,
+    *,
+    ticket_id: int,
+    ticket_number: str | None,
+    subject: str | None,
+    customer_message: str | None,
+    suggested_reply: str,
+    confidence: str,
+    requires_human_attention: bool,
+    retrieval_backend: str | None,
+    matched_examples: list[dict[str, Any]],
+    policy_flags: list[str],
+    source: dict[str, Any],
+    created_at: str,
+) -> dict[str, Any]:
+    cursor = conn.execute(
+        """
+        INSERT INTO support_rag_suggestions
+            (
+                ticket_id,
+                ticket_number,
+                status,
+                subject,
+                customer_message,
+                suggested_reply,
+                confidence,
+                requires_human_attention,
+                retrieval_backend,
+                matched_examples_json,
+                policy_flags_json,
+                source_json,
+                created_at,
+                updated_at
+            )
+        VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            ticket_id,
+            ticket_number,
+            subject,
+            customer_message,
+            suggested_reply,
+            confidence,
+            1 if requires_human_attention else 0,
+            retrieval_backend,
+            json.dumps(matched_examples, sort_keys=True, default=str),
+            json.dumps(policy_flags, sort_keys=True, default=str),
+            json.dumps(source, sort_keys=True, default=str),
+            created_at,
+            created_at,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM support_rag_suggestions WHERE id = ?",
+        (cursor.lastrowid,),
+    ).fetchone()
+    return _support_suggestion_row_to_dict(row)
+
+
+def update_support_rag_suggestion(
+    conn: sqlite3.Connection,
+    *,
+    suggestion_id: int,
+    status: str,
+    updated_at: str,
+    final_reply: str | None = None,
+    sent_at: str | None = None,
+) -> dict[str, Any]:
+    conn.execute(
+        """
+        UPDATE support_rag_suggestions
+        SET status = ?,
+            final_reply = COALESCE(?, final_reply),
+            sent_at = COALESCE(?, sent_at),
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (status, final_reply, sent_at, updated_at, suggestion_id),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM support_rag_suggestions WHERE id = ?",
+        (suggestion_id,),
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"Support RAG suggestion {suggestion_id} was not found")
+    return _support_suggestion_row_to_dict(row)
+
+
+def get_support_rag_suggestion(
+    conn: sqlite3.Connection,
+    suggestion_id: int,
+) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM support_rag_suggestions WHERE id = ?",
+        (suggestion_id,),
+    ).fetchone()
+    return _support_suggestion_row_to_dict(row) if row else None
+
+
+def list_latest_support_rag_suggestions(
+    conn: sqlite3.Connection,
+    *,
+    ticket_ids: Iterable[int] | None = None,
+) -> dict[int, dict[str, Any]]:
+    ids = list(ticket_ids or [])
+    params: list[Any] = []
+    where = ""
+    if ids:
+        placeholders = ",".join("?" for _ in ids)
+        where = f"WHERE ticket_id IN ({placeholders})"
+        params.extend(ids)
+
+    rows = conn.execute(
+        f"""
+        SELECT s.*
+        FROM support_rag_suggestions s
+        JOIN (
+            SELECT ticket_id, MAX(id) AS max_id
+            FROM support_rag_suggestions
+            {where}
+            GROUP BY ticket_id
+        ) latest
+          ON latest.max_id = s.id
+        ORDER BY s.updated_at DESC
+        """,
+        params,
+    ).fetchall()
+    return {
+        int(row["ticket_id"]): _support_suggestion_row_to_dict(row)
+        for row in rows
+    }
