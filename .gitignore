@@ -33,3 +33,5 @@ logs/*
 *.p12
 *.pfx
 secrets/
+
+kb
