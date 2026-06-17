@@ -22,7 +22,7 @@ export type Todo = {
   priority: string | null;
   due_date: string | null;
   project: string | null;
-  tags: string[];
+  tags: number[];
   waiting_person: string | null;
   created_at: string;
   updated_at: string;
