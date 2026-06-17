@@ -7,7 +7,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { apiFetch } from "@/lib/api/client";
 import type { EmailCapture, EmailCaptureDetail } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/time";
-import { Mail, Link as LinkIcon, AlertCircle } from "lucide-react";
+import { Link as LinkIcon, AlertCircle } from "lucide-react";
 
 export function EmailCaptures() {
   const [captures, setCaptures] = useState<EmailCapture[]>([]);
@@ -24,7 +24,7 @@ export function EmailCaptures() {
     try {
       const response = await apiFetch<{ captures: EmailCapture[] }>("/api/email-captures");
       setCaptures(response.captures || []);
-    } catch (err) {
+    } catch {
       setError("Failed to load email captures.");
     } finally {
       setLoading(false);
@@ -35,7 +35,7 @@ export function EmailCaptures() {
     try {
       const response = await apiFetch<{ capture: EmailCaptureDetail }>(`/api/email-captures/${id}`);
       setSelectedCapture(response.capture);
-    } catch (err) {
+    } catch {
       setError("Failed to load capture detail.");
     }
   };

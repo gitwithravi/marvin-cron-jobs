@@ -79,7 +79,7 @@ export function WorkScreen() {
 
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {activeTab === "board" && <TodoBoard todos={todos} tags={tags} people={people} onUpdate={updateTodo} />}
+      {activeTab === "board" && <TodoBoard todos={todos} tags={tags} onUpdate={updateTodo} />}
       {activeTab === "followups" && <FollowUps todos={todos} people={people} onUpdate={updateTodo} />}
       {activeTab === "emails" && <EmailCaptures />}
       {activeTab === "team" && <TeamStatus />}

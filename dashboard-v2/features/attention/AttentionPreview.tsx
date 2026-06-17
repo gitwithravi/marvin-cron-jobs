@@ -1,5 +1,4 @@
 import { Panel } from "@/components/ui/Panel";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { type AttentionItem } from "@/features/attention/getAttentionItems";
 import { formatRelativeTime } from "@/lib/time";
 import { AlertCircle, CheckSquare, Activity, Briefcase, Server } from "lucide-react";
@@ -28,7 +27,7 @@ export function AttentionPreview({ items }: AttentionPreviewProps) {
     return (
       <Panel>
         <div style={{ textAlign: "center", padding: "var(--spacing-lg)", color: "var(--text-muted)" }}>
-          <p style={{ fontSize: "0.9rem" }}>No pending decisions. A rare moment of peace. Don't get attached.</p>
+          <p style={{ fontSize: "0.9rem" }}>No pending decisions. A rare moment of peace. Don&apos;t get attached.</p>
         </div>
       </Panel>
     );

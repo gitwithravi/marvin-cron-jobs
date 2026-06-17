@@ -2,7 +2,6 @@
 
 import { useSupport } from "@/features/support/useSupport";
 import { Panel } from "@/components/ui/Panel";
-import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -11,7 +10,7 @@ import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDateTime } from "@/lib/time";
 import { useState } from "react";
-import { MessageSquare, Sparkles, Send, RefreshCw, Database } from "lucide-react";
+import { Sparkles, Send, RefreshCw, Database } from "lucide-react";
 
 export function SupportScreen() {
   const {
@@ -24,7 +23,6 @@ export function SupportScreen() {
     error,
     selectTicket,
     generateSuggestion,
-    updateDraft,
     sendReply,
     rebuildIndex,
     refresh

@@ -1,15 +1,14 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
-import { type Todo, type TodoTag, type TodoPerson } from "@/lib/api/types";
+import { type Todo, type TodoTag } from "@/lib/api/types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRelativeTime } from "@/lib/time";
-import { Calendar, Tag, User, Flag } from "lucide-react";
+import { Calendar, User, Flag } from "lucide-react";
 
 type TodoBoardProps = {
   todos: Todo[];
   tags: TodoTag[];
-  people: TodoPerson[];
   onUpdate: (id: number, updates: Partial<Todo>) => Promise<void>;
 };
 
@@ -20,7 +19,7 @@ const columns = [
   { id: "pending_on_others", label: "Pending on others", statuses: ["pending_on_others"] }
 ];
 
-export function TodoBoard({ todos, tags, people, onUpdate }: TodoBoardProps) {
+export function TodoBoard({ todos, tags, onUpdate }: TodoBoardProps) {
   const activeTodos = todos.filter((t) => t.status.toLowerCase() !== "done");
 
   if (activeTodos.length === 0) {
@@ -35,7 +34,6 @@ export function TodoBoard({ todos, tags, people, onUpdate }: TodoBoardProps) {
   }
 
   const getTagById = (tagId: number) => tags.find((t) => t.id === tagId);
-  const getPersonById = (personId: number) => people.find((p) => p.id === personId);
 
   const moveTodo = async (id: number, newStatus: string) => {
     try {

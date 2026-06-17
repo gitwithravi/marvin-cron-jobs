@@ -24,7 +24,7 @@ export function useSupport(): UseSupportReturn {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [suggestion, setSuggestion] = useState<SupportSuggestion | null>(null);
-  const [draft, setDraft] = useState("");
+  const [, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -63,15 +63,11 @@ export function useSupport(): UseSupportReturn {
       });
       setSuggestion(response);
       setDraft(response.suggestion_text || "");
-    } catch (err) {
+    } catch {
       setError("Failed to generate suggestion.");
     } finally {
       setGenerating(false);
     }
-  }, []);
-
-  const updateDraft = useCallback((text: string) => {
-    setDraft(text);
   }, []);
 
   const sendReply = useCallback(async (ticketId: number, reply: string) => {
@@ -97,7 +93,7 @@ export function useSupport(): UseSupportReturn {
   const rebuildIndex = useCallback(async () => {
     try {
       await apiFetch("/api/support-rag/index", { method: "POST", body: {} });
-    } catch (err) {
+    } catch {
       setError("Failed to rebuild index.");
     }
   }, []);

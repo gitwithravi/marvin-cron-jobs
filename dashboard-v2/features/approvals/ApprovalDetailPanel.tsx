@@ -6,7 +6,6 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EvidenceBlock } from "@/components/ui/EvidenceBlock";
-import { DataList } from "@/components/ui/DataList";
 import { Timeline } from "@/components/ui/Timeline";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { type ApprovalDetail } from "@/lib/api/types";
@@ -27,8 +26,6 @@ export function ApprovalDetailPanel({ approval, onApprove, onReject, onRefresh }
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approveComment, setApproveComment] = useState("");
   const [rejectReason, setRejectReason] = useState("");
-  const [processing, setProcessing] = useState(false);
-
   if (!approval) {
     return (
       <Panel style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -41,28 +38,22 @@ export function ApprovalDetailPanel({ approval, onApprove, onReject, onRefresh }
   }
 
   const handleApprove = async () => {
-    setProcessing(true);
     try {
       await onApprove(approval.id, approveComment || undefined);
       setShowApproveDialog(false);
       setApproveComment("");
     } catch (err) {
       console.error("Approve failed:", err);
-    } finally {
-      setProcessing(false);
     }
   };
 
   const handleReject = async () => {
-    setProcessing(true);
     try {
       await onReject(approval.id, rejectReason || undefined);
       setShowRejectDialog(false);
       setRejectReason("");
     } catch (err) {
       console.error("Reject failed:", err);
-    } finally {
-      setProcessing(false);
     }
   };
 

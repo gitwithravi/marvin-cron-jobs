@@ -12,7 +12,7 @@ type FollowUpsProps = {
   onUpdate: (id: number, updates: Partial<Todo>) => Promise<void>;
 };
 
-export function FollowUps({ todos, people, onUpdate }: FollowUpsProps) {
+export function FollowUps({ todos, onUpdate }: FollowUpsProps) {
   const waitingTodos = todos.filter((t) => t.waiting_person && t.status.toLowerCase() !== "done");
 
   if (waitingTodos.length === 0) {

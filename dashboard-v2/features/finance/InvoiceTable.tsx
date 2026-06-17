@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { type Invoice } from "@/lib/api/types";
 import { formatCurrency } from "@/lib/format";
 import { formatDate } from "@/lib/time";
-import { FileText, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 type InvoiceTableProps = {
   invoices: Invoice[];

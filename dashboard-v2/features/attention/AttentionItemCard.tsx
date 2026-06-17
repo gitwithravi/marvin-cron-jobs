@@ -1,5 +1,4 @@
 import { type AttentionItem } from "@/features/attention/getAttentionItems";
-import { RiskBadge } from "@/components/ui/RiskBadge";
 import { formatRelativeTime } from "@/lib/time";
 import { AlertCircle, CheckSquare, Activity, Briefcase, Server } from "lucide-react";
 

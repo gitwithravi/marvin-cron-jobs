@@ -45,7 +45,7 @@ export function useApprovals(): UseApprovalsReturn {
       ]);
       setPendingApprovals(pending);
       setHistoryApprovals(history);
-    } catch (err) {
+    } catch {
       setError("Failed to load approvals.");
     } finally {
       setLoading(false);
@@ -58,7 +58,7 @@ export function useApprovals(): UseApprovalsReturn {
         `/api/approvals/${id}`
       );
       setSelectedApproval(response.approval);
-    } catch (err) {
+    } catch {
       setError("Failed to load approval detail.");
     }
   }, []);

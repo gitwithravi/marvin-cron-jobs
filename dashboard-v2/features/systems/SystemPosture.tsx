@@ -2,7 +2,6 @@ import { Panel } from "@/components/ui/Panel";
 import { type BeszelData } from "@/lib/api/types";
 import { type OpenRouterAccountUsage } from "@/lib/openrouter-usage";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { normalizeStatus } from "@/lib/status";
 import { formatPercent } from "@/lib/format";
 
 type SystemPostureProps = {

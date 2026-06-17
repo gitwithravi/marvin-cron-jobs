@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api/client";
 import type { HermesMessage } from "@/lib/api/types";
 
@@ -43,7 +43,7 @@ export function useChatSession(): UseChatSessionReturn {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err) {
+    } catch {
       setError("Failed to get response from Hermes.");
     } finally {
       setLoading(false);

@@ -11,7 +11,6 @@ type PostureStripProps = {
 export function PostureStrip({ attentionItems, runs, beszel }: PostureStripProps) {
   const criticalCount = attentionItems.filter(i => i.severity === "critical").length;
   const highCount = attentionItems.filter(i => i.severity === "high").length;
-  const systemsUp = beszel ? beszel.systems.filter(s => s.status.toLowerCase() === "up").length : 0;
   const systemsTotal = beszel ? beszel.systems.length : 0;
 
   let message: string;

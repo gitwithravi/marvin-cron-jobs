@@ -55,7 +55,7 @@ export function useTodos(): UseTodosReturn {
     setError(null);
     try {
       await Promise.all([fetchTodos(), fetchTags(), fetchPeople()]);
-    } catch (err) {
+    } catch {
       setError("Failed to load todos.");
     } finally {
       setLoading(false);

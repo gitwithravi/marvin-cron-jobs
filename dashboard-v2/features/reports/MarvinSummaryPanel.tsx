@@ -30,7 +30,7 @@ export function MarvinSummaryPanel({ runId, taskName, initialSummary }: MarvinSu
         { method: "POST" }
       );
       setSummary(response.summary);
-    } catch (err) {
+    } catch {
       setError("Failed to generate summary.");
     } finally {
       setLoading(false);

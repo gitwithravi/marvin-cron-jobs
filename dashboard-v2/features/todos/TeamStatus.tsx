@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -15,21 +15,21 @@ export function TeamStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTeamStatus();
-  }, [selectedDate]);
-
-  const loadTeamStatus = async () => {
+  const loadTeamStatus = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiFetch<{ days: TeamStatusDay[] }>(`/api/team-status?date=${selectedDate}`);
       setTeamStatus(response.days || []);
-    } catch (err) {
+    } catch {
       setError("Failed to load team status.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadTeamStatus();
+  }, [loadTeamStatus]);
 
   if (loading) {
     return (
