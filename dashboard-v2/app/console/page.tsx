@@ -39,6 +39,7 @@ export default async function CommandPage() {
         attentionItems={attentionItemsData}
         runs={runs}
         beszel={beszel}
+        apiAvailable={apiAvailable}
       />
 
       <AttentionPreview items={attentionItemsData} />
