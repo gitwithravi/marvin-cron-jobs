@@ -150,7 +150,8 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     }
 
     if (approvalsRes.status === "fulfilled" && approvalsRes.value.ok) {
-      const approvals = (await approvalsRes.value.json()) as Approval[];
+      const data = (await approvalsRes.value.json()) as { approvals?: Approval[] };
+      const approvals = data.approvals || [];
       approvals.forEach(a => items.push(approvalToAttentionItem(a)));
     }
 
@@ -161,7 +162,8 @@ export async function getAttentionItems(): Promise<AttentionItem[]> {
     }
 
     if (todosRes.status === "fulfilled" && todosRes.value.ok) {
-      const todos = (await todosRes.value.json()) as Todo[];
+      const data = (await todosRes.value.json()) as { todos?: Todo[] };
+      const todos = data.todos || [];
       todos.filter(t => t.status.toLowerCase() !== "done" && (t.priority === "urgent" || t.priority === "high" || t.waiting_person))
         .forEach(t => items.push(todoToAttentionItem(t)));
     }
