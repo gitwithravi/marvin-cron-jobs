@@ -7,7 +7,6 @@ import { AlertList } from "@/features/systems/AlertList";
 import { ContainerList } from "@/features/systems/ContainerList";
 import { OpenRouterUsagePanel } from "@/features/systems/OpenRouterUsagePanel";
 import { StatusPagesPanel } from "@/features/systems/StatusPagesPanel";
-import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
 export const dynamic = "force-dynamic";
