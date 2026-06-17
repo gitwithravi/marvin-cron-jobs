@@ -32,7 +32,7 @@ export function useSupport(): UseSupportReturn {
 
   const fetchTickets = useCallback(async () => {
     try {
-      const response = await apiFetch<{ tickets: SupportTicket[] }>("/api/support-rag/tickets");
+      const response = await apiFetch<{ tickets: SupportTicket[] }>("/api/support-rag/tickets?statuses=open");
       setTickets(response.tickets || []);
     } catch (err) {
       console.error("Error fetching tickets:", err);
