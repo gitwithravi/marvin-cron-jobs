@@ -1,17 +1,26 @@
 import sqlite3
 
 from marvin_core.db import (
+    create_agent_approval,
+    create_agent_run,
+    create_agent_run_step,
     connect,
     create_task_run,
+    get_agent_approval,
+    get_agent_run,
     insert_beszel_alert_history_observations,
     insert_beszel_alert_observations,
     insert_beszel_system_snapshots,
     insert_heartbeat_observations,
+    list_agent_approvals,
+    list_agent_run_steps,
     insert_monitor_snapshots,
     insert_report,
     migrate,
     insert_task_run_payload,
     insert_marvin_summary,
+    update_agent_approval,
+    update_agent_run,
 )
 
 
@@ -153,5 +162,69 @@ def test_payload_and_summary_inserts(tmp_path):
     )
     row = conn.execute("SELECT * FROM marvin_summaries WHERE run_id = ? AND model = ?", (run_id, "deepseek/deepseek-v4-flash")).fetchone()
     assert json.loads(row["summary_json"]) == new_summary
+
+    conn.close()
+
+
+def test_agent_run_and_approval_persistence(tmp_path):
+    conn = connect(tmp_path / "marvin.sqlite3")
+    migrate(conn)
+
+    run = create_agent_run(
+        conn,
+        workflow_name="support_reply",
+        subject_type="support_ticket",
+        subject_id="91",
+        target_label="TKT-91 - Payment pending",
+        metadata={"ticket_id": 91},
+        created_at="2026-06-17T10:00:00+00:00",
+        status="waiting_approval",
+    )
+    create_agent_run_step(
+        conn,
+        agent_run_id=run["id"],
+        step_name="generate_support_reply",
+        status="completed",
+        input_data={"ticket_id": 91},
+        output_data={"reply": "Please verify payment."},
+        created_at="2026-06-17T10:00:00+00:00",
+    )
+    approval = create_agent_approval(
+        conn,
+        agent_run_id=run["id"],
+        kind="support_reply",
+        target_label="TKT-91 - Payment pending",
+        summary_text="Payment pending",
+        draft_content={"reply": "Please verify payment.", "support_suggestion_id": 1},
+        evidence={"policy_flags": ["Verify payment"]},
+        created_at="2026-06-17T10:00:00+00:00",
+    )
+
+    assert get_agent_run(conn, run["id"])["status"] == "waiting_approval"
+    assert get_agent_approval(conn, approval["id"])["status"] == "pending"
+    assert len(list_agent_run_steps(conn, run["id"])) == 1
+    assert len(list_agent_approvals(conn, view="pending")) == 1
+
+    updated_approval = update_agent_approval(
+        conn,
+        approval_id=approval["id"],
+        status="approved",
+        edited_content={"reply": "Final reply"},
+        reviewer="ravi",
+        reviewed_at="2026-06-17T10:05:00+00:00",
+        updated_at="2026-06-17T10:05:00+00:00",
+    )
+    updated_run = update_agent_run(
+        conn,
+        agent_run_id=run["id"],
+        status="completed",
+        completed_at="2026-06-17T10:05:00+00:00",
+        updated_at="2026-06-17T10:05:00+00:00",
+    )
+
+    assert updated_approval["status"] == "approved"
+    assert updated_approval["edited_content"]["reply"] == "Final reply"
+    assert updated_run["status"] == "completed"
+    assert len(list_agent_approvals(conn, view="history")) == 1
 
     conn.close()

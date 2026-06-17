@@ -327,6 +327,66 @@ CREATE INDEX IF NOT EXISTS idx_support_rag_suggestions_updated
 
 CREATE INDEX IF NOT EXISTS idx_email_capture_events_capture
     ON email_capture_events(email_capture_id, created_at);
+
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workflow_name TEXT NOT NULL,
+    subject_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    target_label TEXT,
+    status TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT,
+    error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agent_run_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_run_id INTEGER NOT NULL,
+    step_name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    input_json TEXT,
+    output_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (agent_run_id) REFERENCES agent_runs(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS agent_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_run_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    target_label TEXT,
+    summary_text TEXT,
+    draft_content_json TEXT NOT NULL,
+    edited_content_json TEXT,
+    evidence_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    rejection_reason TEXT,
+    reviewer TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    reviewed_at TEXT,
+    FOREIGN KEY (agent_run_id) REFERENCES agent_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_runs_status
+    ON agent_runs(status, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow
+    ON agent_runs(workflow_name, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_agent_run_steps_run
+    ON agent_run_steps(agent_run_id, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_agent_approvals_status
+    ON agent_approvals(status, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_agent_approvals_kind
+    ON agent_approvals(kind, updated_at);
 """
 
 
@@ -927,3 +987,396 @@ def list_latest_support_rag_suggestions(
         int(row["ticket_id"]): _support_suggestion_row_to_dict(row)
         for row in rows
     }
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _json_loads(value: str | None) -> Any:
+    if not value:
+        return None
+    return json.loads(value)
+
+
+def _agent_run_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "workflow_name": row["workflow_name"],
+        "subject_type": row["subject_type"],
+        "subject_id": row["subject_id"],
+        "target_label": row["target_label"],
+        "status": row["status"],
+        "metadata": _json_loads(row["metadata_json"]) or {},
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "completed_at": row["completed_at"],
+        "error": row["error"],
+    }
+
+
+def _agent_run_step_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "agent_run_id": row["agent_run_id"],
+        "step_name": row["step_name"],
+        "status": row["status"],
+        "input": _json_loads(row["input_json"]),
+        "output": _json_loads(row["output_json"]),
+        "error": row["error"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _agent_approval_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "agent_run_id": row["agent_run_id"],
+        "kind": row["kind"],
+        "target_label": row["target_label"],
+        "summary_text": row["summary_text"],
+        "draft_content": _json_loads(row["draft_content_json"]) or {},
+        "edited_content": _json_loads(row["edited_content_json"]) or {},
+        "evidence": _json_loads(row["evidence_json"]) or {},
+        "status": row["status"],
+        "rejection_reason": row["rejection_reason"],
+        "reviewer": row["reviewer"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "reviewed_at": row["reviewed_at"],
+    }
+
+
+def create_agent_run(
+    conn: sqlite3.Connection,
+    *,
+    workflow_name: str,
+    subject_type: str,
+    subject_id: str,
+    target_label: str | None,
+    metadata: dict[str, Any],
+    created_at: str,
+    status: str = "running",
+) -> dict[str, Any]:
+    cursor = conn.execute(
+        """
+        INSERT INTO agent_runs
+            (workflow_name, subject_type, subject_id, target_label, status, metadata_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            workflow_name,
+            subject_type,
+            subject_id,
+            target_label,
+            status,
+            _json_dumps(metadata),
+            created_at,
+            created_at,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM agent_runs WHERE id = ?",
+        (cursor.lastrowid,),
+    ).fetchone()
+    return _agent_run_row_to_dict(row)
+
+
+def update_agent_run(
+    conn: sqlite3.Connection,
+    *,
+    agent_run_id: int,
+    status: str,
+    updated_at: str,
+    metadata: dict[str, Any] | None = None,
+    completed_at: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    current = conn.execute(
+        "SELECT * FROM agent_runs WHERE id = ?",
+        (agent_run_id,),
+    ).fetchone()
+    if current is None:
+        raise LookupError(f"Agent run {agent_run_id} was not found")
+    merged_metadata = _json_loads(current["metadata_json"]) or {}
+    if metadata:
+        merged_metadata.update(metadata)
+    conn.execute(
+        """
+        UPDATE agent_runs
+        SET status = ?,
+            metadata_json = ?,
+            updated_at = ?,
+            completed_at = COALESCE(?, completed_at),
+            error = COALESCE(?, error)
+        WHERE id = ?
+        """,
+        (
+            status,
+            _json_dumps(merged_metadata),
+            updated_at,
+            completed_at,
+            error,
+            agent_run_id,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM agent_runs WHERE id = ?",
+        (agent_run_id,),
+    ).fetchone()
+    return _agent_run_row_to_dict(row)
+
+
+def get_agent_run(conn: sqlite3.Connection, agent_run_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM agent_runs WHERE id = ?",
+        (agent_run_id,),
+    ).fetchone()
+    return _agent_run_row_to_dict(row) if row else None
+
+
+def list_agent_runs(
+    conn: sqlite3.Connection,
+    *,
+    status: str | None = None,
+    workflow_name: str | None = None,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+    if workflow_name:
+        clauses.append("workflow_name = ?")
+        params.append(workflow_name)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = conn.execute(
+        f"""
+        SELECT *
+        FROM agent_runs
+        {where}
+        ORDER BY updated_at DESC, id DESC
+        """,
+        params,
+    ).fetchall()
+    return [_agent_run_row_to_dict(row) for row in rows]
+
+
+def create_agent_run_step(
+    conn: sqlite3.Connection,
+    *,
+    agent_run_id: int,
+    step_name: str,
+    status: str,
+    input_data: dict[str, Any] | None,
+    output_data: dict[str, Any] | None,
+    created_at: str,
+) -> dict[str, Any]:
+    cursor = conn.execute(
+        """
+        INSERT INTO agent_run_steps
+            (agent_run_id, step_name, status, input_json, output_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            agent_run_id,
+            step_name,
+            status,
+            _json_dumps(input_data) if input_data is not None else None,
+            _json_dumps(output_data) if output_data is not None else None,
+            created_at,
+            created_at,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM agent_run_steps WHERE id = ?",
+        (cursor.lastrowid,),
+    ).fetchone()
+    return _agent_run_step_row_to_dict(row)
+
+
+def list_agent_run_steps(conn: sqlite3.Connection, agent_run_id: int) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM agent_run_steps
+        WHERE agent_run_id = ?
+        ORDER BY id ASC
+        """,
+        (agent_run_id,),
+    ).fetchall()
+    return [_agent_run_step_row_to_dict(row) for row in rows]
+
+
+def create_agent_approval(
+    conn: sqlite3.Connection,
+    *,
+    agent_run_id: int,
+    kind: str,
+    target_label: str | None,
+    summary_text: str | None,
+    draft_content: dict[str, Any],
+    evidence: dict[str, Any],
+    created_at: str,
+) -> dict[str, Any]:
+    cursor = conn.execute(
+        """
+        INSERT INTO agent_approvals
+            (agent_run_id, kind, target_label, summary_text, draft_content_json, evidence_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            agent_run_id,
+            kind,
+            target_label,
+            summary_text,
+            _json_dumps(draft_content),
+            _json_dumps(evidence),
+            created_at,
+            created_at,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM agent_approvals WHERE id = ?",
+        (cursor.lastrowid,),
+    ).fetchone()
+    return _agent_approval_row_to_dict(row)
+
+
+def update_agent_approval(
+    conn: sqlite3.Connection,
+    *,
+    approval_id: int,
+    status: str,
+    updated_at: str,
+    edited_content: dict[str, Any] | None = None,
+    rejection_reason: str | None = None,
+    reviewer: str | None = None,
+    reviewed_at: str | None = None,
+) -> dict[str, Any]:
+    row = conn.execute(
+        "SELECT * FROM agent_approvals WHERE id = ?",
+        (approval_id,),
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"Agent approval {approval_id} was not found")
+    conn.execute(
+        """
+        UPDATE agent_approvals
+        SET status = ?,
+            edited_content_json = COALESCE(?, edited_content_json),
+            rejection_reason = COALESCE(?, rejection_reason),
+            reviewer = COALESCE(?, reviewer),
+            updated_at = ?,
+            reviewed_at = COALESCE(?, reviewed_at)
+        WHERE id = ?
+        """,
+        (
+            status,
+            _json_dumps(edited_content) if edited_content is not None else None,
+            rejection_reason,
+            reviewer,
+            updated_at,
+            reviewed_at,
+            approval_id,
+        ),
+    )
+    conn.commit()
+    updated = conn.execute(
+        "SELECT * FROM agent_approvals WHERE id = ?",
+        (approval_id,),
+    ).fetchone()
+    return _agent_approval_row_to_dict(updated)
+
+
+def get_agent_approval(conn: sqlite3.Connection, approval_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM agent_approvals WHERE id = ?",
+        (approval_id,),
+    ).fetchone()
+    return _agent_approval_row_to_dict(row) if row else None
+
+
+def list_agent_approvals(
+    conn: sqlite3.Connection,
+    *,
+    view: str = "pending",
+    kind: str | None = None,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if view == "pending":
+        clauses.append("a.status = 'pending'")
+    elif view == "history":
+        clauses.append("a.status <> 'pending'")
+    if kind:
+        clauses.append("a.kind = ?")
+        params.append(kind)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = conn.execute(
+        f"""
+        SELECT
+            a.*,
+            r.workflow_name,
+            r.subject_type,
+            r.subject_id,
+            r.status AS run_status,
+            r.metadata_json,
+            r.created_at AS run_created_at,
+            r.updated_at AS run_updated_at,
+            r.completed_at AS run_completed_at,
+            r.error AS run_error
+        FROM agent_approvals a
+        JOIN agent_runs r
+          ON r.id = a.agent_run_id
+        {where}
+        ORDER BY a.updated_at DESC, a.id DESC
+        """,
+        params,
+    ).fetchall()
+    approvals: list[dict[str, Any]] = []
+    for row in rows:
+        approval = _agent_approval_row_to_dict(row)
+        approval["run"] = {
+            "id": row["agent_run_id"],
+            "workflow_name": row["workflow_name"],
+            "subject_type": row["subject_type"],
+            "subject_id": row["subject_id"],
+            "status": row["run_status"],
+            "metadata": _json_loads(row["metadata_json"]) or {},
+            "created_at": row["run_created_at"],
+            "updated_at": row["run_updated_at"],
+            "completed_at": row["run_completed_at"],
+            "error": row["run_error"],
+        }
+        approvals.append(approval)
+    return approvals
+
+
+def has_pending_agent_approval(
+    conn: sqlite3.Connection,
+    *,
+    kind: str,
+    subject_type: str,
+    subject_id: str,
+) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM agent_approvals a
+        JOIN agent_runs r
+          ON r.id = a.agent_run_id
+        WHERE a.kind = ?
+          AND a.status = 'pending'
+          AND r.subject_type = ?
+          AND r.subject_id = ?
+        LIMIT 1
+        """,
+        (kind, subject_type, subject_id),
+    ).fetchone()
+    return row is not None

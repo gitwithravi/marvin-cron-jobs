@@ -14,13 +14,24 @@ from requests import RequestException
 import importlib
 import json
 from marvin_core.db import (
+    get_agent_approval,
+    get_agent_run,
     connect,
+    list_agent_approvals,
+    list_agent_run_steps,
+    list_agent_runs,
     get_support_rag_suggestion,
     insert_marvin_summary,
     insert_support_rag_suggestion,
     list_latest_support_rag_suggestions,
     migrate,
     update_support_rag_suggestion,
+)
+from marvin_core.agents import (
+    approve_support_reply,
+    create_support_reply_approval,
+    reject_support_reply,
+    sync_support_reply_approvals,
 )
 from marvin_core.communication_style import load_communication_style
 from marvin_core.openrouter import OpenRouterClient
@@ -173,6 +184,16 @@ class SupportRagSendRequest(BaseModel):
 class SupportRagReviewRequest(BaseModel):
     suggestion_id: int
     status: Literal["ignored", "reviewed"]
+
+
+class SupportReplyWorkflowRequest(BaseModel):
+    ticket_id: int
+
+
+class ApprovalActionRequest(BaseModel):
+    reviewer: str
+    final_reply: str | None = None
+    reason: str | None = None
 
 
 class SupportRagIndexRequest(BaseModel):
@@ -575,6 +596,157 @@ def support_rag_index_endpoint(payload: SupportRagIndexRequest):
         return index_support_kb(use_qdrant=payload.use_qdrant, batch_size=payload.batch_size)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent-runs/support-reply")
+def create_support_reply_workflow_endpoint(payload: SupportReplyWorkflowRequest):
+    try:
+        client = _vityarthi_client()
+        try:
+            ticket = client.fetch_ticket_detail(payload.ticket_id)
+            if not ticket:
+                raise HTTPException(status_code=404, detail=f"Ticket {payload.ticket_id} not found")
+            approval = create_support_reply_approval(
+                database_path=_support_rag_database_path(),
+                ticket=ticket,
+                client=client,
+            )
+        finally:
+            client.close()
+        return {"approval": approval}
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent-runs/support-reply/sync")
+def sync_support_reply_workflows_endpoint(limit: int = 25):
+    try:
+        client = _vityarthi_client()
+        try:
+            tickets = client.fetch_review_tickets(
+                statuses=("open",),
+                per_page=max(1, min(limit, 100)),
+                include_details=True,
+            )
+            result = sync_support_reply_approvals(
+                database_path=_support_rag_database_path(),
+                tickets=tickets,
+                client=client,
+            )
+        finally:
+            client.close()
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agent-runs")
+def list_agent_runs_endpoint(status: str | None = None, workflow_name: str | None = None):
+    try:
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            return {"runs": list_agent_runs(conn, status=status, workflow_name=workflow_name)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agent-runs/{agent_run_id}")
+def get_agent_run_endpoint(agent_run_id: int):
+    try:
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            run = get_agent_run(conn, agent_run_id)
+            if run is None:
+                raise HTTPException(status_code=404, detail=f"Agent run {agent_run_id} not found")
+            run["steps"] = list_agent_run_steps(conn, agent_run_id)
+            return {"run": run}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/approvals")
+def list_approvals_endpoint(view: str = "pending", kind: str | None = None):
+    if view not in {"pending", "history", "all"}:
+        raise HTTPException(status_code=400, detail="view must be pending, history, or all")
+    try:
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            return {"approvals": list_agent_approvals(conn, view=view, kind=kind)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/approvals/{approval_id}")
+def get_approval_endpoint(approval_id: int):
+    try:
+        with connect(_support_rag_database_path()) as conn:
+            migrate(conn)
+            approval = get_agent_approval(conn, approval_id)
+            if approval is None:
+                raise HTTPException(status_code=404, detail=f"Approval {approval_id} not found")
+            run = get_agent_run(conn, approval["agent_run_id"])
+            approval["run"] = run
+            approval["steps"] = list_agent_run_steps(conn, approval["agent_run_id"])
+            return {"approval": approval}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/approvals/{approval_id}/approve")
+def approve_approval_endpoint(approval_id: int, payload: ApprovalActionRequest):
+    try:
+        client = _vityarthi_client()
+        try:
+            approval = approve_support_reply(
+                database_path=_support_rag_database_path(),
+                approval_id=approval_id,
+                reviewer=payload.reviewer,
+                final_reply=payload.final_reply,
+                client=client,
+            )
+        finally:
+            client.close()
+        return {"approval": approval}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except RequestException as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/approvals/{approval_id}/reject")
+def reject_approval_endpoint(approval_id: int, payload: ApprovalActionRequest):
+    try:
+        approval = reject_support_reply(
+            database_path=_support_rag_database_path(),
+            approval_id=approval_id,
+            reviewer=payload.reviewer,
+            reason=payload.reason,
+        )
+        return {"approval": approval}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
