@@ -1,6 +1,7 @@
 import binascii
 import os
 import sys
+import subprocess
 from pathlib import Path
 from typing import Any, Literal
 from collections import Counter
@@ -1001,6 +1002,43 @@ def generate_run_summary_endpoint(run_id: int, task_name: str | None = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.get("/tasks")
+def list_tasks_endpoint():
+    try:
+        tasks = discover_tasks()
+        return tasks
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tasks/{task_name}/run")
+def run_task_endpoint(task_name: str):
+    task_dir = ROOT_DIR / "tasks" / task_name
+    if not task_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    run_file = task_dir / "run.py"
+    if not run_file.exists():
+        raise HTTPException(status_code=404, detail=f"No run.py found for task '{task_name}'")
+
+    try:
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT_DIR)
+        subprocess.Popen(
+            [sys.executable, "-m", f"tasks.{task_name}.run"],
+            cwd=str(ROOT_DIR),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return {"ok": True, "task_name": task_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from marvin_core.task_registry import discover_tasks
 
 
 if __name__ == "__main__":

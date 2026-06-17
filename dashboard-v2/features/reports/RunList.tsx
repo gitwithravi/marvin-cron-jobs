@@ -5,27 +5,32 @@ import { Panel } from "@/components/ui/Panel";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "@/lib/time";
 import { normalizeRisk } from "@/lib/risk";
 import { normalizeStatus } from "@/lib/status";
-import { type TaskRun } from "@/lib/api/types";
+import { apiFetch } from "@/lib/api/client";
+import { type TaskRun, type TaskInfo } from "@/lib/api/types";
 import { type RunFilters, filterRuns, getUniqueValues } from "./runMappers";
-import { Filter, CheckCircle, XCircle } from "lucide-react";
+import { Filter, CheckCircle, XCircle, Play, LoaderCircle } from "lucide-react";
 
 type RunListProps = {
   runs: TaskRun[];
+  tasks: TaskInfo[];
 };
 
-export function RunList({ runs }: RunListProps) {
+export function RunList({ runs, tasks }: RunListProps) {
   const [filters, setFilters] = useState<RunFilters>({
     task: "",
     risk: "",
     status: "",
     hasSummary: ""
   });
+  const [runningTask, setRunningTask] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
   const filteredRuns = filterRuns(runs, filters);
-  const tasks = getUniqueValues(runs, "task_name");
+  const taskNames = getUniqueValues(runs, "task_name");
   const risks = getUniqueValues(runs, "risk_level");
   const statuses = getUniqueValues(runs, "status");
 
@@ -33,83 +38,138 @@ export function RunList({ runs }: RunListProps) {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleRunNow = async () => {
+    const taskName = filters.task;
+    if (!taskName) return;
+
+    setRunningTask(taskName);
+    setRunError(null);
+    try {
+      await apiFetch(`/api/tasks/${encodeURIComponent(taskName)}/run`, { method: "POST" });
+    } catch {
+      setRunError(`Failed to trigger ${taskName}.`);
+    } finally {
+      setRunningTask(null);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing)" }}>
       <Panel style={{ background: "var(--surface-2)" }}>
-        <div style={{ display: "flex", gap: "var(--spacing)", flexWrap: "wrap", alignItems: "center" }}>
-          <Filter size={16} style={{ color: "var(--text-muted)" }} />
-          
-          <select
-            value={filters.task}
-            onChange={(e) => updateFilter("task", e.target.value)}
-            style={{
-              background: "var(--surface-3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "6px 10px",
-              color: "var(--text)",
-              fontSize: "0.85rem"
-            }}
-          >
-            <option value="">All tasks</option>
-            {tasks.map((task) => (
-              <option key={task} value={task}>{task}</option>
-            ))}
-          </select>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--spacing)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--spacing)", flexWrap: "wrap", alignItems: "center" }}>
+            <Filter size={16} style={{ color: "var(--text-muted)" }} />
 
-          <select
-            value={filters.risk}
-            onChange={(e) => updateFilter("risk", e.target.value)}
-            style={{
-              background: "var(--surface-3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "6px 10px",
-              color: "var(--text)",
-              fontSize: "0.85rem"
-            }}
-          >
-            <option value="">All risks</option>
-            {risks.map((risk) => (
-              <option key={risk} value={risk}>{risk}</option>
-            ))}
-          </select>
+            <select
+              value={filters.task}
+              onChange={(e) => updateFilter("task", e.target.value)}
+              style={{
+                background: "var(--surface-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                color: "var(--text)",
+                fontSize: "0.85rem",
+                minWidth: "180px"
+              }}
+            >
+              <option value="">All tasks</option>
+              {taskNames.map((task) => (
+                <option key={task} value={task}>{task}</option>
+              ))}
+            </select>
 
-          <select
-            value={filters.status}
-            onChange={(e) => updateFilter("status", e.target.value)}
-            style={{
-              background: "var(--surface-3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "6px 10px",
-              color: "var(--text)",
-              fontSize: "0.85rem"
-            }}
-          >
-            <option value="">All statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+            <select
+              value={filters.risk}
+              onChange={(e) => updateFilter("risk", e.target.value)}
+              style={{
+                background: "var(--surface-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                color: "var(--text)",
+                fontSize: "0.85rem"
+              }}
+            >
+              <option value="">All risks</option>
+              {risks.map((risk) => (
+                <option key={risk} value={risk}>{risk}</option>
+              ))}
+            </select>
 
-          <select
-            value={filters.hasSummary}
-            onChange={(e) => updateFilter("hasSummary", e.target.value)}
-            style={{
-              background: "var(--surface-3)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "6px 10px",
-              color: "var(--text)",
-              fontSize: "0.85rem"
-            }}
-          >
-            <option value="">Summary: any</option>
-            <option value="yes">Has summary</option>
-            <option value="no">No summary</option>
-          </select>
+            <select
+              value={filters.status}
+              onChange={(e) => updateFilter("status", e.target.value)}
+              style={{
+                background: "var(--surface-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                color: "var(--text)",
+                fontSize: "0.85rem"
+              }}
+            >
+              <option value="">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+
+            <select
+              value={filters.hasSummary}
+              onChange={(e) => updateFilter("hasSummary", e.target.value)}
+              style={{
+                background: "var(--surface-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                color: "var(--text)",
+                fontSize: "0.85rem"
+              }}
+            >
+              <option value="">Summary: any</option>
+              <option value="yes">Has summary</option>
+              <option value="no">No summary</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", gap: "var(--spacing-sm)", alignItems: "center" }}>
+            <select
+              value={filters.task}
+              onChange={(e) => updateFilter("task", e.target.value)}
+              style={{
+                background: "var(--surface-3)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                color: "var(--text)",
+                fontSize: "0.85rem",
+                fontFamily: "var(--font-mono)",
+                minWidth: "220px"
+              }}
+            >
+              <option value="">Select task to run...</option>
+              {tasks.map((task) => (
+                <option key={task.task_name} value={task.task_name}>
+                  {task.display_name} ({task.task_name})
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              icon={runningTask ? <LoaderCircle size={16} /> : <Play size={16} />}
+              onClick={handleRunNow}
+              disabled={!filters.task || runningTask !== null}
+            >
+              {runningTask ? "Running..." : "Run Now"}
+            </Button>
+          </div>
         </div>
+        {runError && (
+          <div style={{ marginTop: "var(--spacing-sm)", fontSize: "0.85rem", color: "var(--critical)" }}>
+            {runError}
+          </div>
+        )}
       </Panel>
 
       {filteredRuns.length === 0 ? (

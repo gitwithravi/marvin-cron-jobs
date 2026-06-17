@@ -69,6 +69,12 @@ export type AlertDigest = {
   triggered_by: string[];
 };
 
+export type TaskInfo = {
+  task_name: string;
+  display_name: string;
+  description: string;
+};
+
 export type BeszelSystem = {
   name: string;
   status: string;
