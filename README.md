@@ -1,12 +1,12 @@
 # MARVIN Agent
 
-MARVIN is a script-first operations agent with a private web dashboard. Tasks run as normal Python scripts, collect factual data, persist observations, ask an LLM for a compact analysis, and write Markdown reports. The dashboard exposes those reports, live operational views, todos, alerts, OpenRouter usage, and Hermes chat access.
+MARVIN is a script-first operations agent with a private web dashboard. Tasks run as normal Python scripts, collect factual data, persist observations, ask an LLM for a compact analysis, and write Markdown reports. The dashboard exposes those reports, live operational views, todos, alerts, OpenRouter usage, and approval workflows for operator-reviewed actions.
 
 ## Features
 
 - **Authenticated dashboard**: Next.js dashboard with signed HTTP-only session cookies.
+- **Approval queue**: Central pending/history view for operator-reviewed actions such as support replies.
 - **Report browser**: Lists generated Markdown reports by task and renders report details.
-- **Hermes chat**: Dashboard chat surface for an OpenAI-compatible Hermes agent endpoint.
 - **Todos and tags**: Create, update, retag, and list operational todos through the dashboard and MARVIN API.
 - **Invoice reimbursement tracker**: Upload invoice PDFs, extract reimbursement fields with OpenRouter, confirm them, store records in SQLite, and archive PDFs locally.
 - **Team status board**: Fetches member task status for a selected date and shows per-member summaries.
@@ -14,6 +14,7 @@ MARVIN is a script-first operations agent with a private web dashboard. Tasks ru
 - **Alerts**: Generates and serves latest operational alerts.
 - **Notifications**: Optional Telegram notifications per task, controlled by each task's `config.yaml`.
 - **Script-first tasks**: Uptime Kuma heartbeat, Beszel server status, team status, and VITyarthi support tickets.
+- **Support reply drafting**: Open support tickets are synced into the approval queue automatically and grounded reply drafts are generated from the local support RAG index.
 
 ## Architecture
 
@@ -149,6 +150,8 @@ The PM2 config starts:
 - `marvin-dashboard`: Next.js on `127.0.0.1:3030`
 - `marvin-api`: FastAPI MARVIN API using `.venv/bin/python3`
 
+No PM2 or deployment topology change is required for the approval queue. It runs inside the existing `marvin-api` and `marvin-dashboard` processes.
+
 Useful commands:
 
 ```bash
@@ -268,7 +271,7 @@ python -m tasks.vityarthi_support_tickets.run --dry-run
 
 ### VITyarthi Support RAG
 
-Builds a local reply-suggestion index from CSV exports in `kb/`, then serves generated drafts in the dashboard Support queue. Drafts can be edited, copied, ignored, or sent through the VITyarthi system API after manual approval.
+Builds a local reply-suggestion index from CSV exports in `kb/`, then uses it to generate grounded reply drafts for open support tickets. The support dashboard syncs reviewable tickets into the central Approvals queue automatically. Operators review, edit, approve, or reject those drafts from the Approvals page.
 
 ```bash
 python tools/index_support_rag.py
@@ -286,8 +289,9 @@ The Python MARVIN API exposes local-only endpoints used by the dashboard:
 - `GET /todo-tags`, `POST /todo-tags`: tag operations.
 - `GET /team-status?date=YYYY-MM-DD`: live team status board payload.
 - `GET /alerts/latest`, `POST /alerts/refresh`: alert display and refresh.
-- `GET /support-rag/tickets`, `POST /support-rag/suggest`, `POST /support-rag/send`: support reply review queue.
-- `POST /support-rag/index`: rebuild support RAG indexes from `kb/`.
+- `GET /support-rag/tickets`, `POST /support-rag/index`: support intake and support RAG maintenance.
+- `POST /agent-runs/support-reply/sync`: sync open support tickets into pending approvals without duplicating existing pending items.
+- `GET /approvals`, `GET /approvals/{id}`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject`: approval queue and approval actions.
 
 The dashboard wraps these with authenticated `/api/*` routes. Unauthenticated requests return `401`.
 

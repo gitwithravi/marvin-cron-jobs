@@ -106,6 +106,11 @@ async function readJson(response: Response) {
   return data;
 }
 
+function truncateText(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trim() + "…";
+}
+
 export function TodoManager() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tags, setTags] = useState<TodoTag[]>([]);
@@ -130,6 +135,7 @@ export function TodoManager() {
   const [pendingPrompt, setPendingPrompt] = useState<PendingPromptState | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string>("");
   const [newPersonName, setNewPersonName] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   async function refresh() {
     setError("");
@@ -433,20 +439,21 @@ export function TodoManager() {
   return (
     <div className="todo-layout">
       <form className="todo-capture" onSubmit={createTodo}>
-        <div>
-          <p className="eyebrow">Capture</p>
-          <h2>Add todo</h2>
+        <div className="todo-capture-header">
+          <div>
+            <p className="eyebrow">Capture</p>
+            <h2>Add todo</h2>
+          </div>
         </div>
-        <label>
-          Todo
+        <label className="todo-capture-label">
           <textarea
             value={todoText}
             onChange={(event) => setTodoText(event.target.value)}
             placeholder="Take followup from Aditya on VITyarthi data analysis by 16th June"
-            rows={5}
+            rows={3}
           />
         </label>
-        <button className="button primary" disabled={isSaving || !todoText.trim()} type="submit">
+        <button className="button primary todo-capture-btn" disabled={isSaving || !todoText.trim()} type="submit">
           Add to triage
         </button>
       </form>
@@ -473,62 +480,77 @@ export function TodoManager() {
         </div>
 
         <div className="todo-toolbar">
-          <div className="todo-toolbar-filters">
-            <label>
-              Source
-              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | "email" | "manual")}>
-                <option value="all">all</option>
-                <option value="email">email</option>
-                <option value="manual">manual</option>
-              </select>
-            </label>
-            <label>
-              Project
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value as TodoProject | "all")}>
-                <option value="all">all</option>
-                {projects.map((item) => (
-                  <option key={item} value={item}>{label(item)}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Review
-              <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as "all" | "unreviewed" | "reviewed")}>
-                <option value="all">all</option>
-                <option value="unreviewed">unreviewed</option>
-                <option value="reviewed">reviewed</option>
-              </select>
-            </label>
-          </div>
-          <div className="todo-toolbar-actions">
-            {selectedFilterCount > 0 && (
-              <button
-                className="button"
-                type="button"
-                onClick={() => {
-                  setSourceFilter("all");
-                  setProjectFilter("all");
-                  setReviewFilter("all");
-                  setSelectedTagIds([]);
-                }}
-              >
-                Clear filters
-              </button>
-            )}
-            <button className="button" type="button" onClick={() => setIsTagModalOpen(true)}>
-              Create tag
-            </button>
-          </div>
+          <button
+            className={`filter-toggle-btn ${showFilters || selectedFilterCount > 0 ? "active" : ""}`}
+            onClick={() => setShowFilters(!showFilters)}
+            type="button"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            Filters
+            {selectedFilterCount > 0 && <span className="filter-count">{selectedFilterCount}</span>}
+          </button>
+          <button className="button" type="button" onClick={() => setIsTagModalOpen(true)}>
+            Create tag
+          </button>
         </div>
 
-        <div className="filter-tags">
-          {tags.map((tag) => (
-            <label key={tag.id} className="check-row">
-              <input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleFilterTag(tag.id)} />
-              <span>{tag.name}</span>
-            </label>
-          ))}
-        </div>
+        {showFilters && (
+          <div className="todo-filters-panel">
+            <div className="todo-filters-row">
+              <label>
+                Source
+                <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as "all" | "email" | "manual")}>
+                  <option value="all">all</option>
+                  <option value="email">email</option>
+                  <option value="manual">manual</option>
+                </select>
+              </label>
+              <label>
+                Project
+                <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value as TodoProject | "all")}>
+                  <option value="all">all</option>
+                  {projects.map((item) => (
+                    <option key={item} value={item}>{label(item)}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Review
+                <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value as "all" | "unreviewed" | "reviewed")}>
+                  <option value="all">all</option>
+                  <option value="unreviewed">unreviewed</option>
+                  <option value="reviewed">reviewed</option>
+                </select>
+              </label>
+              {selectedFilterCount > 0 && (
+                <button
+                  className="button clear-filters-btn"
+                  type="button"
+                  onClick={() => {
+                    setSourceFilter("all");
+                    setProjectFilter("all");
+                    setReviewFilter("all");
+                    setSelectedTagIds([]);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {tags.length > 0 && (
+              <div className="filter-tags">
+                {tags.map((tag) => (
+                  <label key={tag.id} className="check-row">
+                    <input type="checkbox" checked={selectedTagIds.includes(tag.id)} onChange={() => toggleFilterTag(tag.id)} />
+                    <span>{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <p className="muted">Loading todos...</p>
@@ -546,12 +568,19 @@ export function TodoManager() {
                   <div className="kanban-column-header">
                     <div>
                       <h3>{column.title}</h3>
-                      <p className="muted">{columnTodos.length} items</p>
+                      <p className="muted">{columnTodos.length} item{columnTodos.length === 1 ? "" : "s"}</p>
                     </div>
                   </div>
                   <div className="kanban-column-body">
                     {columnTodos.length === 0 ? (
-                      <div className="kanban-empty">No items here.</div>
+                      <div className="kanban-empty">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                        </svg>
+                        <p>No items</p>
+                      </div>
                     ) : (
                       columnTodos.map((todo) => (
                         <article
@@ -561,28 +590,34 @@ export function TodoManager() {
                           onDragStart={() => handleDragStart(todo.id)}
                           onDragEnd={() => setDraggingTodoId(null)}
                         >
-                          <div className="todo-card-header">
+                          <div className="todo-card-top">
                             <div className="todo-card-title">
                               <h3>{todo.title}</h3>
-                              {todo.notes && <p className="muted">{todo.notes}</p>}
                             </div>
-                            <button className="button todo-card-edit" onClick={() => setEditingTodo(todo)} type="button" aria-label={`Edit ${todo.title}`}>
-                              Update
+                            <button
+                              className="todo-card-edit-btn"
+                              onClick={() => setEditingTodo(todo)}
+                              type="button"
+                              aria-label={`Edit ${todo.title}`}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
                             </button>
                           </div>
-                          <div className="todo-meta-row">
+                          {todo.notes && <p className="todo-card-notes">{truncateText(todo.notes, 120)}</p>}
+                          <div className="todo-card-meta">
                             <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
-                            <span className="todo-status">{label(todo.status)}</span>
-                            <span className="todo-status">{label(todo.project)}</span>
-                            {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
-                            {todo.waiting_on_person && <span className="todo-status">Waiting on {todo.waiting_on_person.name}</span>}
+                            {todo.due_date && <span className="todo-due">Due {todo.due_date}</span>}
+                            {todo.waiting_on_person && <span className="todo-waiting">Waiting: {todo.waiting_on_person.name}</span>}
                           </div>
-                          <div className="tag-row">
+                          <div className="todo-card-tags">
                             {todo.tags.map((tag) => (
                               <span className={`tag-chip ${isOthers(tag) ? "tag-others" : ""}`} key={tag.id}>{tag.name}</span>
                             ))}
                           </div>
-                          <div className="todo-card-footer">
+                          <div className="todo-card-actions">
                             <select
                               aria-label={`Move ${todo.title}`}
                               value={todo.status}
@@ -605,13 +640,19 @@ export function TodoManager() {
           <div className="followup-list">
             {followupGroups.length === 0 ? (
               <div className="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
                 <h2>No follow-ups pending</h2>
                 <p className="muted">Tasks waiting on other people will appear here.</p>
               </div>
             ) : (
               followupGroups.map((group) => (
                 <section className="followup-person-card" key={group.person.id}>
-                  <div className="todo-item-header">
+                  <div className="followup-person-header">
                     <div>
                       <h3>{group.person.name}</h3>
                       <p className="muted">{group.todos.length} waiting task{group.todos.length === 1 ? "" : "s"}</p>
@@ -620,17 +661,13 @@ export function TodoManager() {
                   <div className="followup-task-list">
                     {group.todos.map((todo) => (
                       <article className="todo-item" key={todo.id}>
-                        <div className="todo-item-header">
-                          <div>
-                            <h3>{todo.title}</h3>
-                            {todo.notes && <p className="muted">{todo.notes}</p>}
+                        <div className="todo-item-content">
+                          <h3>{todo.title}</h3>
+                          {todo.notes && <p className="muted">{truncateText(todo.notes, 100)}</p>}
+                          <div className="todo-item-meta">
+                            <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
+                            {todo.due_date && <span className="todo-due">Due {todo.due_date}</span>}
                           </div>
-                          <button className="button" onClick={() => setEditingTodo(todo)} type="button">Open</button>
-                        </div>
-                        <div className="todo-meta-row">
-                          <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
-                          <span className="todo-status">{label(todo.project)}</span>
-                          {todo.due_date && <span className="todo-date">Due {todo.due_date}</span>}
                         </div>
                         <div className="followup-actions">
                           <button className="button" onClick={() => void moveTodo(todo, "update_needed")} type="button">Need update</button>
@@ -654,6 +691,10 @@ export function TodoManager() {
             </div>
             {historyTodos.length === 0 ? (
               <div className="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
                 <h2>No completed tasks in view</h2>
                 <p className="muted">Recent completed work will appear here when you ask for it.</p>
               </div>
@@ -661,18 +702,16 @@ export function TodoManager() {
               <div className="todo-list">
                 {historyTodos.map((todo) => (
                   <article className="todo-item" key={todo.id}>
-                    <div className="todo-item-header">
-                      <div>
-                        <h3>{todo.title}</h3>
-                        {todo.notes && <p className="muted">{todo.notes}</p>}
+                    <div className="todo-item-content">
+                      <h3>{todo.title}</h3>
+                      {todo.notes && <p className="muted">{truncateText(todo.notes, 100)}</p>}
+                      <div className="todo-item-meta">
+                        <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
+                        <span className="todo-status-done">done</span>
+                        {todo.completed_at && <span className="todo-due">Completed {new Date(todo.completed_at).toLocaleDateString()}</span>}
                       </div>
-                      <button className="button" onClick={() => setEditingTodo(todo)} type="button">Open</button>
                     </div>
-                    <div className="todo-meta-row">
-                      <span className={`todo-priority priority-${todo.priority}`}>{label(todo.priority)}</span>
-                      <span className="todo-status">done</span>
-                      {todo.completed_at && <span className="todo-date">Completed {new Date(todo.completed_at).toLocaleDateString()}</span>}
-                    </div>
+                    <button className="button" onClick={() => setEditingTodo(todo)} type="button">Open</button>
                   </article>
                 ))}
               </div>
