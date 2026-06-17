@@ -80,18 +80,17 @@ function formatPercent(value: number | null | undefined) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "Unknown";
-  }
+function timeAgo(value: string | null | undefined) {
+  if (!value) return "unknown";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return value;
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 async function readJson(response: Response) {
@@ -147,6 +146,13 @@ function sparkPath(points: BeszelSeriesPoint[], metric: keyof BeszelSeriesPoint)
     .join(" ");
 }
 
+function sparkColor(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "#99a6a3";
+  if (value >= 90) return "#a23a32";
+  if (value >= 70) return "#9b6a22";
+  return "#477f68";
+}
+
 function Sparkline({
   label,
   metric,
@@ -159,16 +165,17 @@ function Sparkline({
   value: number | null;
 }) {
   const path = sparkPath(points, metric);
+  const color = sparkColor(value);
 
   return (
     <div className="beszel-spark">
-      <div>
-        <span>{label}</span>
-        <strong>{formatPercent(value)}</strong>
+      <div className="beszel-spark-header">
+        <span className="beszel-spark-label">{label}</span>
+        <strong className="beszel-spark-value" style={{ color }}>{formatPercent(value)}</strong>
       </div>
       <svg viewBox="0 0 120 46" role="img" aria-label={`${label} trend`}>
         <line x1="4" x2="116" y1="42" y2="42" />
-        {path ? <path d={path} /> : <text x="60" y="26">No data</text>}
+        {path ? <path d={path} style={{ stroke: color }} /> : <text x="60" y="26">No data</text>}
       </svg>
     </div>
   );
@@ -183,6 +190,14 @@ function statusClass(status: string | null | undefined) {
     return "beszel-status-down";
   }
   return "beszel-status-unknown";
+}
+
+function containerStatusClass(status: string | null | undefined) {
+  const normalized = (status || "unknown").toLowerCase();
+  if (normalized === "running") return "container-status-running";
+  if (normalized === "exited" || normalized === "dead") return "container-status-stopped";
+  if (normalized === "created" || normalized === "restarting") return "container-status-pending";
+  return "container-status-unknown";
 }
 
 export function BeszelOverview() {
@@ -231,14 +246,52 @@ export function BeszelOverview() {
   return (
     <div className="beszel-stack">
       <section className="beszel-toolbar">
-        <div>
-          <p className="eyebrow">Live API</p>
-          <h2>Beszel overview</h2>
-          <p className="muted">
-            {fetchedAt ? `Updated ${formatDateTime(fetchedAt)}` : "Waiting for first refresh"}
-          </p>
+        <div className="beszel-toolbar-left">
+          <div>
+            <p className="eyebrow">Infrastructure</p>
+            <h2>Beszel overview</h2>
+          </div>
+          {fetchedAt && (
+            <p className="beszel-updated">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Updated {timeAgo(fetchedAt)}
+            </p>
+          )}
         </div>
-        <button className="button" type="button" onClick={() => refresh(false)} disabled={isRefreshing}>
+        <div className="beszel-toolbar-stats">
+          <div className="beszel-stat">
+            <span className="beszel-stat-value">{payload?.summary.systemCount ?? 0}</span>
+            <span className="beszel-stat-label">Systems</span>
+          </div>
+          <div className="beszel-stat beszel-stat-up">
+            <span className="beszel-stat-value">{upCount}</span>
+            <span className="beszel-stat-label">Up</span>
+          </div>
+          {downCount > 0 && (
+            <div className="beszel-stat beszel-stat-down">
+              <span className="beszel-stat-value">{downCount}</span>
+              <span className="beszel-stat-label">Down</span>
+            </div>
+          )}
+          <div className="beszel-stat">
+            <span className="beszel-stat-value">{payload?.summary.containerCount ?? 0}</span>
+            <span className="beszel-stat-label">Containers</span>
+          </div>
+          {triggeredAlerts.length > 0 && (
+            <div className="beszel-stat beszel-stat-alert">
+              <span className="beszel-stat-value">{triggeredAlerts.length}</span>
+              <span className="beszel-stat-label">Alerts</span>
+            </div>
+          )}
+        </div>
+        <button className="button beszel-refresh-btn" type="button" onClick={() => refresh(false)} disabled={isRefreshing}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
           {isRefreshing ? "Refreshing" : "Refresh"}
         </button>
       </section>
@@ -247,35 +300,22 @@ export function BeszelOverview() {
 
       {isLoading ? (
         <section className="empty-state">
-          <h2>Loading Beszel</h2>
-          <p className="muted">Fetching live infrastructure data.</p>
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+            <line x1="6" y1="6" x2="6.01" y2="6" />
+            <line x1="6" y1="18" x2="6.01" y2="18" />
+          </svg>
+          <h2>Loading infrastructure</h2>
+          <p className="muted">Fetching live server data from Beszel.</p>
         </section>
       ) : payload ? (
         <>
-          <section className="metric-grid" aria-label="Beszel summary">
-            <div className="metric">
-              <span>{payload.summary.systemCount}</span>
-              <p>Systems</p>
-            </div>
-            <div className="metric">
-              <span>{upCount} up / {downCount} down</span>
-              <p>Status</p>
-            </div>
-            <div className="metric">
-              <span>{payload.summary.triggeredAlertCount}</span>
-              <p>Triggered alerts</p>
-            </div>
-            <div className="metric">
-              <span>{payload.summary.containerCount}</span>
-              <p>Containers</p>
-            </div>
-          </section>
-
           <section className="beszel-system-grid" aria-label="Beszel systems">
             {payload.systems.map((system) => (
               <article className="beszel-system-card" key={system.id}>
                 <div className="beszel-system-header">
-                  <div>
+                  <div className="beszel-system-info">
                     <h2>{system.name}</h2>
                     <p>{system.host || "No host recorded"}</p>
                   </div>
@@ -286,20 +326,13 @@ export function BeszelOverview() {
 
                 <div className="beszel-spark-grid">
                   <Sparkline label="CPU" metric="cpu" points={system.series} value={system.latest.cpu} />
-                  <Sparkline
-                    label="Memory"
-                    metric="memory"
-                    points={system.series}
-                    value={system.latest.memory}
-                  />
+                  <Sparkline label="Memory" metric="memory" points={system.series} value={system.latest.memory} />
                   <Sparkline label="Disk" metric="disk" points={system.series} value={system.latest.disk} />
                 </div>
 
-                <div className="beszel-system-meta">
-                  <span>{system.containers.length} containers</span>
-                  <span>{system.alerts.filter((alert) => alert.triggered).length} triggered alerts</span>
-                  <span>{system.series.length} chart points</span>
-                </div>
+                {system.updated && (
+                  <p className="beszel-system-updated">Last updated {timeAgo(system.updated)}</p>
+                )}
               </article>
             ))}
           </section>
@@ -311,22 +344,28 @@ export function BeszelOverview() {
                   <p className="eyebrow">Alerts</p>
                   <h2>Triggered alerts</h2>
                 </div>
-                <span>{payload.windows.alertHistoryHours}h history</span>
+                <span className="beszel-panel-badge">{payload.windows.alertHistoryHours}h window</span>
               </div>
               {triggeredAlerts.length > 0 ? (
                 <ul className="beszel-list">
                   {triggeredAlerts.map((alert) => (
-                    <li key={alert.id ?? `${alert.system}-${alert.name}`}>
-                      <strong>{alert.name || "Unnamed alert"}</strong>
-                      <span>{alert.systemName || alert.system || "Unknown system"}</span>
-                      <small>Value {alert.value ?? "n/a"} / min {alert.min ?? "n/a"}</small>
+                    <li key={alert.id ?? `${alert.system}-${alert.name}`} className="beszel-alert-item">
+                      <div className="beszel-alert-top">
+                        <strong>{alert.name || "Unnamed alert"}</strong>
+                        <span className="beszel-alert-system">{alert.systemName || alert.system || "Unknown"}</span>
+                      </div>
+                      <small>Value: {alert.value ?? "n/a"} / threshold: {alert.min ?? "n/a"}</small>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <div className="beszel-empty-panel">
-                  <h3>No triggered alerts</h3>
-                  <p className="muted">Beszel returned no active alert triggers.</p>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <h3>All clear</h3>
+                  <p className="muted">No active alert triggers in the last {payload.windows.alertHistoryHours} hours.</p>
                 </div>
               )}
             </article>
@@ -337,22 +376,40 @@ export function BeszelOverview() {
                   <p className="eyebrow">Containers</p>
                   <h2>Container status</h2>
                 </div>
-                <span>{Object.keys(payload.summary.containerStatusCounts).length} states</span>
+                <span className="beszel-panel-badge">{payload.containers.length} total</span>
               </div>
               {payload.containers.length > 0 ? (
                 <ul className="beszel-list beszel-container-list">
-                  {payload.containers.slice(0, 18).map((container) => (
-                    <li key={container.id ?? `${container.system}-${container.name}`}>
-                      <strong>{container.name || "Unnamed container"}</strong>
-                      <span>{container.systemName || container.system || "Unknown system"}</span>
-                      <small>{container.status || "unknown"} {container.image ? `- ${container.image}` : ""}</small>
+                  {payload.containers.slice(0, 20).map((container) => (
+                    <li key={container.id ?? `${container.system}-${container.name}`} className="beszel-container-item">
+                      <div className="beszel-container-top">
+                        <strong>{container.name || "Unnamed container"}</strong>
+                        <span className={`beszel-container-status ${containerStatusClass(container.status)}`}>
+                          {container.status || "unknown"}
+                        </span>
+                      </div>
+                      <div className="beszel-container-meta">
+                        <span>{container.systemName || container.system || "Unknown"}</span>
+                        {container.image && <span className="beszel-container-image">{container.image}</span>}
+                      </div>
                     </li>
                   ))}
+                  {payload.containers.length > 20 && (
+                    <li className="beszel-list-more">
+                      <span>+{payload.containers.length - 20} more containers</span>
+                    </li>
+                  )}
                 </ul>
               ) : (
                 <div className="beszel-empty-panel">
-                  <h3>No containers found</h3>
-                  <p className="muted">The Beszel containers collection returned no records.</p>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                    <line x1="6" y1="6" x2="6.01" y2="6" />
+                    <line x1="6" y1="18" x2="6.01" y2="18" />
+                  </svg>
+                  <h3>No containers</h3>
+                  <p className="muted">No container records found.</p>
                 </div>
               )}
             </article>
@@ -360,6 +417,11 @@ export function BeszelOverview() {
         </>
       ) : (
         <section className="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
           <h2>Beszel unavailable</h2>
           <p className="muted">No live payload is available.</p>
         </section>
