@@ -92,15 +92,15 @@ export function todoToAttentionItem(todo: Todo): AttentionItem {
 export function beszelToAttentionItems(beszel: BeszelData): AttentionItem[] {
   const items: AttentionItem[] = [];
 
-  beszel.alerts.filter(a => !a.resolved).forEach(alert => {
+  beszel.alerts.filter(a => a.triggered).forEach(alert => {
     items.push({
       id: `beszel-alert-${alert.id}`,
       kind: "beszel",
       severity: "high",
-      title: `${alert.system_name}: ${alert.alert_type}`,
-      summary: alert.message,
-      evidence: `Triggered: ${alert.triggered_at}`,
-      updatedAt: alert.triggered_at,
+      title: `${alert.systemName}: ${alert.name}`,
+      summary: `Value: ${alert.value} (min: ${alert.min})`,
+      evidence: `Created: ${alert.created}`,
+      updatedAt: alert.created,
       href: "/console/systems",
       actionLabel: "View"
     });
@@ -113,8 +113,8 @@ export function beszelToAttentionItems(beszel: BeszelData): AttentionItem[] {
       severity: "critical",
       title: `${system.name} is down`,
       summary: "System status: down",
-      evidence: `Last updated: ${system.last_updated}`,
-      updatedAt: system.last_updated,
+      evidence: `Last updated: ${system.updated}`,
+      updatedAt: system.updated,
       href: "/console/systems",
       actionLabel: "View"
     });

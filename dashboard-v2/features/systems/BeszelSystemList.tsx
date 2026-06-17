@@ -36,33 +36,33 @@ export function BeszelSystemList({ systems }: BeszelSystemListProps) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}>
-            {system.cpu_percent !== null && (
+            {system.latest.cpu !== null && system.latest.cpu !== undefined && (
               <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)", fontSize: "0.85rem" }}>
                 <Cpu size={14} style={{ color: "var(--text-muted)" }} />
                 <span style={{ color: "var(--text-muted)", minWidth: "60px" }}>CPU</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.cpu_percent)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.latest.cpu)}</span>
               </div>
             )}
 
-            {system.memory_percent !== null && (
+            {system.latest.memory !== null && system.latest.memory !== undefined && (
               <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)", fontSize: "0.85rem" }}>
                 <MemoryStick size={14} style={{ color: "var(--text-muted)" }} />
                 <span style={{ color: "var(--text-muted)", minWidth: "60px" }}>Memory</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.memory_percent)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.latest.memory)}</span>
               </div>
             )}
 
-            {system.disk_percent !== null && (
+            {system.latest.disk !== null && system.latest.disk !== undefined && (
               <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)", fontSize: "0.85rem" }}>
                 <HardDrive size={14} style={{ color: "var(--text-muted)" }} />
                 <span style={{ color: "var(--text-muted)", minWidth: "60px" }}>Disk</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.disk_percent)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatPercent(system.latest.disk)}</span>
               </div>
             )}
           </div>
 
           <div style={{ marginTop: "var(--spacing)", paddingTop: "var(--spacing-sm)", borderTop: "1px solid var(--border)", fontSize: "0.75rem", color: "var(--text-faint)", fontFamily: "var(--font-mono)" }}>
-            Updated {formatRelativeTime(system.last_updated)}
+            Updated {formatRelativeTime(system.updated)}
           </div>
         </Panel>
       ))}

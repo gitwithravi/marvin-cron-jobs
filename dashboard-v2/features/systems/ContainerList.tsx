@@ -26,7 +26,7 @@ export function ContainerList({ containers }: ContainerListProps) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "var(--spacing-sm)" }}>
         {containers.map((container) => (
           <div
-            key={container.name}
+            key={container.id || `${container.systemName}-${container.name}`}
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -44,7 +44,7 @@ export function ContainerList({ containers }: ContainerListProps) {
                   {container.name}
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-faint)" }}>
-                  {container.system_name}
+                  {container.systemName}
                 </div>
               </div>
             </div>

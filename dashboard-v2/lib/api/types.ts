@@ -72,25 +72,31 @@ export type AlertDigest = {
 export type BeszelSystem = {
   name: string;
   status: string;
-  cpu_percent: number | null;
-  memory_percent: number | null;
-  disk_percent: number | null;
-  last_updated: string;
+  latest: {
+    cpu: number | null;
+    memory: number | null;
+    disk: number | null;
+    load: number | null;
+  };
+  updated: string;
 };
 
 export type BeszelAlert = {
   id: number;
-  system_name: string;
-  alert_type: string;
-  message: string;
-  triggered_at: string;
-  resolved: boolean;
+  systemName: string;
+  name: string;
+  triggered: boolean;
+  value: number;
+  min: number;
+  created: string;
+  updated: string;
 };
 
 export type BeszelContainer = {
+  id: string;
   name: string;
   status: string;
-  system_name: string;
+  systemName: string;
 };
 
 export type BeszelData = {

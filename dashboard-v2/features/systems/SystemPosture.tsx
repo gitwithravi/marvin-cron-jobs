@@ -38,8 +38,8 @@ export function SystemPosture({ beszel, openrouter, apiAvailable }: SystemPostur
               <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "var(--spacing-xs)", fontFamily: "var(--font-mono)" }}>
                 ACTIVE ALERTS
               </p>
-              <p style={{ fontSize: "0.9rem", fontWeight: 500, color: beszel.alerts.filter(a => !a.resolved).length > 0 ? "var(--warning)" : "var(--text)" }}>
-                {beszel.alerts.filter(a => !a.resolved).length}
+              <p style={{ fontSize: "0.9rem", fontWeight: 500, color: beszel.alerts.filter(a => a.triggered).length > 0 ? "var(--warning)" : "var(--text)" }}>
+                {beszel.alerts.filter(a => a.triggered).length}
               </p>
             </div>
           </>
