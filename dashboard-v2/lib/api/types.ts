@@ -163,7 +163,7 @@ export type InvoiceExtraction = {
   amount_usd: number | null;
   amount_inr: number | null;
   currency_detected: string | null;
-  confidence: string;
+  confidence: number;
   is_duplicate: boolean;
   duplicate_invoice_id: number | null;
 };

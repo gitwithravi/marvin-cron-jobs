@@ -35,3 +35,13 @@ logs/*
 secrets/
 
 kb
+
+# Dashboard v2 generated and local-only files
+dashboard-v2/.next/
+dashboard-v2/node_modules/
+dashboard-v2/out/
+dashboard-v2/.vercel/
+dashboard-v2/coverage/
+dashboard-v2/.env
+dashboard-v2/.env.*
+!dashboard-v2/.env.example

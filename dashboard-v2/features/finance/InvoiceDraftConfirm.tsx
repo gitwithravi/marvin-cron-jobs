@@ -22,6 +22,10 @@ export function InvoiceDraftConfirm({ extraction, onSave, onCancel, saving }: In
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [usdConfirmed, setUsdConfirmed] = useState(false);
 
+  const confidenceNum = typeof extraction.confidence === "number" ? extraction.confidence : 0;
+  const confidenceLabel = confidenceNum >= 0.8 ? "HIGH" : confidenceNum >= 0.5 ? "MEDIUM" : "LOW";
+  const confidenceColor = confidenceNum >= 0.8 ? "var(--healthy)" : confidenceNum >= 0.5 ? "var(--warning)" : "var(--critical)";
+
   const requiresUsdConfirmation = extraction.currency_detected === "USD" && extraction.amount_usd !== null;
 
   const handleSave = async () => {
@@ -45,14 +49,14 @@ export function InvoiceDraftConfirm({ extraction, onSave, onCancel, saving }: In
             style={{
               fontSize: "0.75rem",
               padding: "4px 8px",
-              background: extraction.confidence === "high" ? "var(--healthy)" : extraction.confidence === "medium" ? "var(--warning)" : "var(--critical)",
+              background: confidenceColor,
               color: "var(--bg)",
               borderRadius: "var(--radius-sm)",
               fontFamily: "var(--font-mono)",
               fontWeight: 600
             }}
           >
-            {extraction.confidence.toUpperCase()}
+            {confidenceLabel}
           </span>
         </div>
 
