@@ -5263,3 +5263,821 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+.console-shell {
+  --bg: #0c1113;
+  --surface: #12191c;
+  --surface-muted: #182126;
+  --panel: #06090b;
+  --border: #243138;
+  --border-strong: #314149;
+  --text: #d7e2de;
+  --muted: #91a49d;
+  --accent: #7fb38f;
+  --accent-dark: #a7d6b4;
+  --danger: #d26c64;
+  --warning: #c99649;
+  --success: #62ae82;
+  --shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(127, 179, 143, 0.12), transparent 22%),
+    linear-gradient(180deg, #0d1316 0%, #091012 100%);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.console-shell::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+}
+
+.console-sidebar {
+  background: rgba(6, 9, 11, 0.88);
+  border-right: 1px solid rgba(127, 179, 143, 0.12);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 24px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.console-sidebar::before {
+  color: #6d8279;
+  content: "LOCAL OPS / SINGLE OPERATOR";
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 20px;
+}
+
+.console-brand {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+
+.console-brand span {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.console-brand small,
+.console-sidebar-footer p,
+.console-topbar-label,
+.console-page-copy,
+.console-panel-time span,
+.console-empty-state p {
+  color: var(--muted);
+}
+
+.console-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.console-nav a {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #c7d2ce;
+  padding: 10px 12px;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.console-nav a:hover,
+.console-nav a.active {
+  background: rgba(127, 179, 143, 0.1);
+  border-color: rgba(127, 179, 143, 0.18);
+  color: #f4f8f5;
+}
+
+.console-sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.console-sidebar-footer p {
+  margin: 0;
+}
+
+.console-main {
+  min-width: 0;
+  padding: 26px;
+  position: relative;
+}
+
+.console-content {
+  display: grid;
+  gap: 20px;
+}
+
+.console-topbar {
+  align-items: center;
+  background: rgba(18, 25, 28, 0.9);
+  border: 1px solid rgba(127, 179, 143, 0.12);
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  position: sticky;
+  top: 18px;
+  z-index: 1;
+  backdrop-filter: blur(8px);
+}
+
+.console-topbar-label {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.console-topbar-copy {
+  margin: 0;
+}
+
+.console-page-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.console-page-intro,
+.console-section,
+.console-operational-panel,
+.console-report-sidebar {
+  background: rgba(18, 25, 28, 0.92);
+  border: 1px solid rgba(127, 179, 143, 0.12);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.console-page-intro {
+  align-items: end;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.console-page-intro h1,
+.console-section h2,
+.console-report-sidebar h1 {
+  color: #f1f5f3;
+  margin: 0;
+}
+
+.console-page-copy {
+  margin: 10px 0 0;
+  max-width: 70ch;
+}
+
+.console-page-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.console-eyebrow {
+  color: #82ae90;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.console-section {
+  padding: 22px;
+}
+
+.console-section-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+}
+
+.console-section-grid-primary {
+  align-items: start;
+}
+
+.console-section-header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.console-section-header h2 {
+  font-size: 1.15rem;
+}
+
+.console-meta-pill {
+  background: rgba(127, 179, 143, 0.12);
+  border: 1px solid rgba(127, 179, 143, 0.16);
+  border-radius: 999px;
+  color: #dce9e1;
+  display: inline-flex;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.76rem;
+  padding: 8px 10px;
+}
+
+.console-markdown-surface {
+  background: rgba(6, 9, 11, 0.5);
+  border: 1px solid rgba(127, 179, 143, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.console-markdown-surface .markdown-viewer {
+  color: #d7e2de;
+}
+
+.console-markdown-surface pre,
+.console-markdown-surface code {
+  background: #0a1012;
+}
+
+.console-list,
+.console-compact-list,
+.console-operational-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.console-operational-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.console-operational-panel {
+  color: inherit;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.console-panel-head {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.console-panel-head h3 {
+  margin: 0;
+}
+
+.console-panel-time {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  margin: 8px 0 0;
+}
+
+.console-panel-time span {
+  display: block;
+  margin-top: 4px;
+}
+
+.console-panel-conclusion {
+  color: #eff6f1;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.console-panel-evidence,
+.console-panel-meta,
+.console-secondary-metric {
+  background: rgba(6, 9, 11, 0.48);
+  border: 1px solid rgba(127, 179, 143, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.console-panel-evidence p,
+.console-panel-meta p,
+.console-secondary-metric p {
+  margin: 0;
+}
+
+.console-secondary-metric {
+  display: grid;
+  gap: 8px;
+}
+
+.console-secondary-metric strong {
+  font-size: 2rem;
+}
+
+.console-status-badge {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: inline-flex;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.console-status-badge.compact {
+  padding: 6px 8px;
+}
+
+.console-status-badge.tone-healthy,
+.console-status-badge.tone-approved {
+  color: #82cf9a;
+}
+
+.console-status-badge.tone-warning,
+.console-status-badge.tone-pending,
+.console-status-badge.tone-running {
+  color: #e0b269;
+}
+
+.console-status-badge.tone-critical,
+.console-status-badge.tone-failed,
+.console-status-badge.tone-rejected {
+  color: #e28079;
+}
+
+.console-status-badge.tone-neutral {
+  color: #afbfba;
+}
+
+.console-empty-state {
+  background: rgba(6, 9, 11, 0.48);
+  border: 1px dashed rgba(127, 179, 143, 0.18);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.console-empty-state h2,
+.console-empty-state h3 {
+  margin: 0 0 8px;
+}
+
+.console-report-layout .report-content,
+.console-report-layout .report-sidebar {
+  background: transparent;
+}
+
+.console-report-sidebar {
+  padding: 20px;
+}
+
+.console-shell .sidebar,
+.console-shell .app-shell,
+.console-shell .main-content {
+  background: transparent;
+}
+
+.console-shell .page-header,
+.console-shell .posture-band,
+.console-shell .metric,
+.console-shell .usage-panel,
+.console-shell .section-band,
+.console-shell .task-card,
+.console-shell .report-link,
+.console-shell .report-detail-view,
+.console-shell .report-analysis-card,
+.console-shell .report-json-section,
+.console-shell .todo-section,
+.console-shell .todo-column,
+.console-shell .todo-filters,
+.console-shell .todo-item,
+.console-shell .todo-editor,
+.console-shell .todo-tag-manager,
+.console-shell .approvals-shell,
+.console-shell .approval-list-panel,
+.console-shell .approval-detail-panel,
+.console-shell .status-page-card,
+.console-shell .team-status-section,
+.console-shell .team-status-member,
+.console-shell .support-rag-layout,
+.console-shell .support-rag-toolbar,
+.console-shell .support-ticket,
+.console-shell .support-suggestion-panel,
+.console-shell .email-capture-list,
+.console-shell .email-capture-detail,
+.console-shell .email-capture-toolbar,
+.console-shell .invoice-shell,
+.console-shell .invoice-summary,
+.console-shell .invoice-panel,
+.console-shell .beszel-card,
+.console-shell .beszel-hero,
+.console-shell .beszel-section {
+  background: rgba(18, 25, 28, 0.92);
+  border-color: rgba(127, 179, 143, 0.12);
+  color: var(--text);
+}
+
+.console-shell .muted,
+.console-shell .task-card-subtitle,
+.console-shell .task-meta-label,
+.console-shell .report-link-meta,
+.console-shell .report-timestamp-full,
+.console-shell .approval-meta,
+.console-shell .todo-meta,
+.console-shell .invoice-help,
+.console-shell .status-page-description {
+  color: var(--muted);
+}
+
+.console-shell .button,
+.console-shell .login-form button,
+.console-shell .icon-button {
+  background: rgba(127, 179, 143, 0.08);
+  border-color: rgba(127, 179, 143, 0.2);
+  color: #e7f0eb;
+}
+
+.console-shell .button.primary {
+  background: #7fb38f;
+  border-color: #7fb38f;
+  color: #08100b;
+}
+
+.console-shell .text-button:hover,
+.console-shell .back-link:hover {
+  color: var(--accent-dark);
+}
+
+.console-shell input,
+.console-shell textarea,
+.console-shell select {
+  background: #0d1417;
+  border-color: rgba(127, 179, 143, 0.18);
+  color: var(--text);
+}
+
+.console-shell .error-banner {
+  background: rgba(210, 108, 100, 0.12);
+  border-color: rgba(210, 108, 100, 0.22);
+  color: #efb4ae;
+}
+
+@media (max-width: 1100px) {
+  .console-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .console-sidebar {
+    min-height: auto;
+    position: static;
+  }
+
+  .console-section-grid,
+  .console-operational-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.console-shell .approvals-list-panel,
+.console-shell .approvals-detail-panel,
+.console-shell .approval-list-item,
+.console-shell .team-status-toolbar,
+.console-shell .team-member-card,
+.console-shell .team-task-item,
+.console-shell .summary-stat,
+.console-shell .team-status-pill,
+.console-shell .team-task-status,
+.console-shell .beszel-spark,
+.console-shell .beszel-list li,
+.console-shell .beszel-panel-badge,
+.console-shell .beszel-alert-system,
+.console-shell .beszel-container-status,
+.console-shell .todo-capture,
+.console-shell .todo-list-section,
+.console-shell .todo-toolbar,
+.console-shell .todo-filters-panel,
+.console-shell .kanban-column,
+.console-shell .todo-card,
+.console-shell .check-row,
+.console-shell .quick-retag,
+.console-shell .capture-detail-item,
+.console-shell .capture-status,
+.console-shell .capture-status-pill,
+.console-shell .capture-section-badge,
+.console-shell .email-capture-row,
+.console-shell .facts-card,
+.console-shell .evidence-card,
+.console-shell .evidence-customer,
+.console-shell .evidence-staff,
+.console-shell .draft-textarea,
+.console-shell .review-meta-card,
+.console-shell .confirm-modal,
+.console-shell .support-match,
+.console-shell .support-ticket-grid section,
+.console-shell .support-policy-flags,
+.console-shell .invoice-empty,
+.console-shell .invoice-upload-zone,
+.console-shell .invoice-total-card,
+.console-shell .invoice-warning,
+.console-shell .invoice-warning-duplicate,
+.console-shell .invoice-check,
+.console-shell .invoice-field input,
+.console-shell .invoice-upload input,
+.console-shell .invoice-confirm-grid input,
+.console-shell .invoice-month input,
+.console-shell .report-facts-list li,
+.console-shell .report-actions-list li,
+.console-shell .json-viewer,
+.console-shell .json-count,
+.console-shell .badge,
+.console-shell .section-count,
+.console-shell .evidence-toggle,
+.console-shell .workflow-step-status,
+.console-shell .beszel-stat,
+.console-shell .beszel-status,
+.console-shell .report-status,
+.console-shell .summary-badge,
+.console-shell .approval-status,
+.console-shell .support-ticket-meta span,
+.console-shell .support-rag-badges span,
+.console-shell .support-confidence,
+.console-shell .risk-badge,
+.console-shell .empty-state {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(173, 204, 185, 0.18);
+  box-shadow: none;
+}
+
+.console-shell .approvals-list-panel,
+.console-shell .approvals-detail-panel,
+.console-shell .report-toolbar,
+.console-shell .report-analysis-card,
+.console-shell .report-error-details,
+.console-shell .markdown-viewer,
+.console-shell .usage-panel,
+.console-shell .invoice-panel,
+.console-shell .support-rag-toolbar,
+.console-shell .support-ticket-item,
+.console-shell .beszel-toolbar,
+.console-shell .beszel-panel,
+.console-shell .beszel-system-card,
+.console-shell .beszel-empty-panel,
+.console-shell .team-empty-member,
+.console-shell .task-card,
+.console-shell .report-link,
+.console-shell .invoice-table-wrap,
+.console-shell .status-tabs,
+.console-shell .status-page-iframe,
+.console-shell .approval-actions-section {
+  background: transparent;
+  border-color: rgba(173, 204, 185, 0.16);
+  box-shadow: none;
+}
+
+.console-shell .approval-list-item.active,
+.console-shell .report-link.active,
+.console-shell .email-capture-row.selected,
+.console-shell .todo-view-switcher .tab.active,
+.console-shell .filter-toggle-btn.active,
+.console-shell .task-card:hover,
+.console-shell .task-card:focus-visible {
+  background: rgba(127, 179, 143, 0.06);
+  border-color: rgba(151, 214, 169, 0.35);
+  box-shadow: 0 0 0 1px rgba(151, 214, 169, 0.12);
+}
+
+.console-shell .approval-list-item:hover,
+.console-shell .report-link:hover,
+.console-shell .team-task-item:hover,
+.console-shell .todo-card:hover,
+.console-shell .email-capture-row:hover,
+.console-shell .evidence-card-header:hover,
+.console-shell .json-node summary:hover,
+.console-shell .json-row:hover,
+.console-shell .invoice-table tbody tr:hover {
+  background: rgba(127, 179, 143, 0.04);
+}
+
+.console-shell .invoice-table,
+.console-shell .invoice-table th,
+.console-shell .invoice-table td,
+.console-shell .status-page-iframe {
+  background: transparent;
+}
+
+.console-shell .json-viewer-header,
+.console-shell .report-error-details pre,
+.console-shell .markdown-viewer pre,
+.console-shell .json-raw pre {
+  background: rgba(4, 7, 8, 0.7);
+}
+
+.console-shell .json-tree,
+.console-shell .json-key,
+.console-shell .json-string,
+.console-shell .json-number,
+.console-shell .json-boolean,
+.console-shell .json-null {
+  color: inherit;
+}
+
+.console-shell .json-key {
+  color: #9fd3b0;
+}
+
+.console-shell .json-string {
+  color: #d8c28a;
+}
+
+.console-shell .json-number {
+  color: #8cc6da;
+}
+
+.console-shell .json-boolean {
+  color: #c3a4dd;
+}
+
+.console-shell .report-llm-quote {
+  color: #d7e2de;
+}
+
+.console-shell .beszel-stat-up,
+.console-shell .report-status-success,
+.console-shell .summary-badge,
+.console-shell .approval-status-approved,
+.console-shell .workflow-step-status-completed,
+.console-shell .workflow-step-status-success,
+.console-shell .status-done,
+.console-shell .capture-status-pill.capture-status-task_created,
+.console-shell .capture-status-task_created,
+.console-shell .support-confidence.confidence-high,
+.console-shell .invoice-confidence.confidence-high {
+  background: rgba(98, 174, 130, 0.12);
+  border-color: rgba(98, 174, 130, 0.28);
+  color: #9dd7b0;
+}
+
+.console-shell .beszel-stat-down,
+.console-shell .report-status-failed,
+.console-shell .report-status-error,
+.console-shell .approval-status-rejected,
+.console-shell .approval-status-cancelled,
+.console-shell .workflow-step-status-failed,
+.console-shell .workflow-step-status-error,
+.console-shell .status-blocked,
+.console-shell .priority-high,
+.console-shell .capture-status-pill.capture-status-rejected,
+.console-shell .capture-status-pill.capture-status-failed,
+.console-shell .capture-status-rejected,
+.console-shell .capture-status-failed,
+.console-shell .support-confidence.confidence-low,
+.console-shell .invoice-confidence.confidence-low {
+  background: rgba(210, 108, 100, 0.1);
+  border-color: rgba(210, 108, 100, 0.24);
+  color: #efb4ae;
+}
+
+.console-shell .beszel-stat-alert,
+.console-shell .approval-status-pending,
+.console-shell .workflow-step-status-running,
+.console-shell .workflow-step-status-pending,
+.console-shell .status-planned,
+.console-shell .priority-medium,
+.console-shell .capture-status-pill.capture-status-duplicate,
+.console-shell .capture-status-duplicate,
+.console-shell .support-confidence.confidence-medium,
+.console-shell .invoice-confidence.confidence-medium,
+.console-shell .policy-flag {
+  background: rgba(201, 150, 73, 0.1);
+  border-color: rgba(201, 150, 73, 0.24);
+  color: #e3be7f;
+}
+
+.console-shell .beszel-status-up {
+  background: rgba(98, 174, 130, 0.1);
+  border-color: rgba(98, 174, 130, 0.24);
+  color: #9dd7b0;
+}
+
+.console-shell .beszel-status-down {
+  background: rgba(210, 108, 100, 0.1);
+  border-color: rgba(210, 108, 100, 0.24);
+  color: #efb4ae;
+}
+
+.console-shell .beszel-status-unknown,
+.console-shell .report-status-running,
+.console-shell .approval-status,
+.console-shell .workflow-step-status,
+.console-shell .status-in_progress,
+.console-shell .capture-status-pill.capture-status-received,
+.console-shell .capture-status-pill.capture-status-parsed,
+.console-shell .capture-status-received,
+.console-shell .capture-status-parsed,
+.console-shell .badge,
+.console-shell .section-count,
+.console-shell .support-ticket-meta span,
+.console-shell .support-rag-badges span,
+.console-shell .support-confidence,
+.console-shell .risk-badge {
+  color: #b8c9c2;
+}
+
+.console-shell .team-toolbar-date input[type="date"],
+.console-shell .todo-capture-label textarea,
+.console-shell .todo-filters-row select,
+.console-shell .todo-card-actions select,
+.console-shell .capture-preview pre {
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(173, 204, 185, 0.16);
+  color: var(--text);
+}
+
+.console-shell .todo-card,
+.console-shell .team-task-item,
+.console-shell .email-capture-row,
+.console-shell .capture-detail-item,
+.console-shell .beszel-spark,
+.console-shell .kanban-column {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.console-shell .kanban-empty,
+.console-shell .beszel-empty-panel,
+.console-shell .team-empty-member,
+.console-shell .invoice-empty,
+.console-shell .empty-state {
+  background: transparent;
+  border-color: rgba(173, 204, 185, 0.22);
+}
+
+.console-shell .summary-stat-active,
+.console-shell .status-in_progress,
+.console-shell .todo-due,
+.console-shell .capture-status-pill.capture-status-received,
+.console-shell .capture-status-pill.capture-status-parsed,
+.console-shell .capture-status-received,
+.console-shell .capture-status-parsed {
+  background: rgba(108, 164, 214, 0.1);
+  border-color: rgba(108, 164, 214, 0.24);
+  color: #9cc8ea;
+}
+
+.console-shell .priority-low,
+.console-shell .todo-status-done,
+.console-shell .team-task-done,
+.console-shell .capture-status-pill.capture-status-task_created,
+.console-shell .capture-status-task_created {
+  background: rgba(98, 174, 130, 0.1);
+  border-color: rgba(98, 174, 130, 0.24);
+  color: #9dd7b0;
+}
+
+.console-shell .todo-waiting,
+.console-shell .tag-others {
+  background: rgba(168, 126, 205, 0.12);
+  border-color: rgba(168, 126, 205, 0.22);
+  color: #d1b5ea;
+}
+
+.console-shell .priority-urgent,
+.console-shell .todo-view-switcher .tab.active,
+.console-shell .filter-toggle-btn.active {
+  background: rgba(127, 179, 143, 0.16);
+  border-color: rgba(151, 214, 169, 0.28);
+  color: #e6f4ea;
+}
+
+.console-shell .invoice-field input,
+.console-shell .invoice-upload input,
+.console-shell .invoice-confirm-grid input,
+.console-shell .invoice-month input,
+.console-shell .draft-textarea,
+.console-shell .rejection-block textarea,
+.console-shell .support-ticket-grid textarea {
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(173, 204, 185, 0.16);
+}
+
+.console-shell .invoice-total-card,
+.console-shell .facts-card,
+.console-shell .evidence-card,
+.console-shell .support-match,
+.console-shell .support-ticket-grid section,
+.console-shell .invoice-empty,
+.console-shell .empty-state {
+  border-style: solid;
+}

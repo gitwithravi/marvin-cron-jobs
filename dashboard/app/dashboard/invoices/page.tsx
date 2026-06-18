@@ -1,16 +1,5 @@
-import { InvoiceManager } from "@/components/invoices/InvoiceManager";
+import { redirect } from "next/navigation";
 
 export default function InvoicesPage() {
-  return (
-    <div className="page-stack">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Invoices</p>
-          <h1>Reimbursement Tracker</h1>
-          <p className="muted">Upload invoices, confirm extracted fields, and keep monthly claims complete.</p>
-        </div>
-      </header>
-      <InvoiceManager />
-    </div>
-  );
+  redirect("/console/invoices");
 }

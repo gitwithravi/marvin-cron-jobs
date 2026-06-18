@@ -120,7 +120,7 @@ export function SupportRagManager() {
           <p className="muted">Open tickets are synced into the shared approval workflow automatically.</p>
         </div>
         <div className="support-rag-actions">
-          <a className="button" href="/dashboard/approvals">
+          <a className="button" href="/console/approvals">
             Open approvals
           </a>
           <button className="button" type="button" onClick={() => loadTickets({ syncFirst: true })} disabled={isLoading || busyKey !== null}>

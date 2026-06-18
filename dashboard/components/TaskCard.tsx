@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { consoleRoutes } from "@/lib/console/routes";
 import type { TaskSummary } from "@/lib/tasks";
 
 function formatDate(value: string | null | undefined): string {
@@ -28,7 +29,7 @@ export function TaskCard({ task }: { task: TaskSummary }) {
   const riskClass = task.riskLevel ? `risk-badge risk-${task.riskLevel}` : "risk-badge";
 
   return (
-    <Link className="task-card" href={`/dashboard/reports/${task.taskName}`} aria-labelledby={`${task.taskName}-title`}>
+    <Link className="task-card" href={`${consoleRoutes.reports}/${task.taskName}`} aria-labelledby={`${task.taskName}-title`}>
       <div className="task-card-top">
         <div className="task-card-info">
           <h2 id={`${task.taskName}-title`}>{task.displayName}</h2>

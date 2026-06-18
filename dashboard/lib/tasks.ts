@@ -2,6 +2,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import YAML from "yaml";
+import { consoleRoutes } from "./console/routes";
 import { marvinApiBaseUrl } from "./marvin-server";
 
 export type ReportSummary = {
@@ -110,7 +111,7 @@ export async function getTasks(): Promise<TaskSummary[]> {
             return {
               fileName: String(run.id),
               label: formatDateLabel(timeVal),
-              href: `/dashboard/reports/${encodeURIComponent(taskName)}?report=${run.id}`,
+              href: `${consoleRoutes.reports}/${encodeURIComponent(taskName)}?report=${run.id}`,
               modifiedAt: timeVal,
               isLatest: index === 0,
               hasSummary: !!run.has_summary,
