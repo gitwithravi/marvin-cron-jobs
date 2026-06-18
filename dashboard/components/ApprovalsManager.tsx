@@ -258,7 +258,6 @@ export function ApprovalsManager() {
           ) : (
             <div className="approvals-list">
               {approvals.map((approval) => {
-                const reply = asString(approval.edited_content.reply) || asString(approval.draft_content.reply);
                 return (
                   <button
                     className={`approval-list-item ${approval.id === selectedId ? "active" : ""}`}
@@ -272,7 +271,6 @@ export function ApprovalsManager() {
                     </div>
                     <h3>{approval.target_label || approval.summary_text || `Approval ${approval.id}`}</h3>
                     <p>{approval.summary_text || "No summary available."}</p>
-                    {reply ? <p className="approval-list-preview">{reply}</p> : null}
                     <div className="approval-list-meta">
                       <span>{approval.run.workflow_name}</span>
                       <span>{new Date(approval.updated_at).toLocaleString()}</span>

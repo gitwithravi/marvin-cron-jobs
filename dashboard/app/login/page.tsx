@@ -23,28 +23,46 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
-        <div>
-          <p className="eyebrow">{marvinCopy.productName}</p>
+        <div className="login-intro">
+          <p className="console-eyebrow">Local Ops / Single Operator</p>
           <h1 id="login-title">{marvinCopy.consoleName}</h1>
-          <p className="muted">{marvinCopy.loginSubtitle}</p>
+          <p className="login-copy">{marvinCopy.loginSubtitle}</p>
+
+          <div className="login-posture">
+            <div>
+              <span className="login-posture-label">Purpose</span>
+              <strong>See what broke, what MARVIN concluded, and what still needs human ceremony.</strong>
+            </div>
+            <div>
+              <span className="login-posture-label">Surface</span>
+              <strong>Private command center. Not an admin panel.</strong>
+            </div>
+          </div>
         </div>
-        {message ? <p className="error-banner">{message}</p> : null}
-        <form action="/api/login" method="post" className="login-form">
-          <label>
-            Username
-            <input name="username" type="text" autoComplete="username" required />
-          </label>
-          <label>
-            Password
-            <input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
-          <button type="submit">Sign in</button>
-        </form>
+
+        <div className="login-form-panel">
+          <div className="login-form-header">
+            <p className="console-eyebrow">Authenticate</p>
+            <h2>Sign in</h2>
+          </div>
+          {message ? <p className="error-banner">{message}</p> : null}
+          <form action="/api/login" method="post" className="login-form">
+            <label>
+              Username
+              <input name="username" type="text" autoComplete="username" required />
+            </label>
+            <label>
+              Password
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <button type="submit">Enter console</button>
+          </form>
+        </div>
       </section>
     </main>
   );

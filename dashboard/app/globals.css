@@ -62,6 +62,10 @@ pre {
 
 .login-page {
   align-items: center;
+  background:
+    radial-gradient(circle at top right, rgba(127, 179, 143, 0.12), transparent 22%),
+    linear-gradient(180deg, #0d1316 0%, #091012 100%);
+  color: #d7e2de;
   display: flex;
   min-height: 100vh;
   justify-content: center;
@@ -69,26 +73,28 @@ pre {
 }
 
 .login-panel {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  background: rgba(18, 25, 28, 0.78);
+  border: 1px solid rgba(127, 179, 143, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   display: grid;
-  gap: 24px;
-  max-width: 420px;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 420px);
+  max-width: 1080px;
+  overflow: hidden;
   padding: 28px;
   position: relative;
   width: 100%;
 }
 
 .login-panel::before {
-  background: var(--panel);
+  background:
+    linear-gradient(90deg, rgba(127, 179, 143, 0.24), rgba(127, 179, 143, 0.02)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
   content: "";
-  height: 4px;
-  left: 0;
+  inset: 0;
   position: absolute;
-  right: 0;
-  top: 0;
+  pointer-events: none;
 }
 
 .login-panel h1,
@@ -99,13 +105,92 @@ pre {
   margin: 0;
 }
 
+.login-intro,
+.login-form-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.login-intro {
+  align-content: start;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 8px 6px 8px 4px;
+}
+
+.login-intro h1 {
+  color: #f1f5f3;
+  font-size: clamp(2.2rem, 4vw, 3.6rem);
+  max-width: 10ch;
+}
+
+.login-copy {
+  color: #9cb0a8;
+  font-size: 1.04rem;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 56ch;
+}
+
+.login-posture {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.login-posture div {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(127, 179, 143, 0.14);
+  border-radius: 14px;
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+}
+
+.login-posture-label {
+  color: #82ae90;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.login-posture strong {
+  color: #e4ece8;
+  font-size: 0.98rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.login-form-panel {
+  background: rgba(8, 12, 14, 0.58);
+  border: 1px solid rgba(127, 179, 143, 0.16);
+  border-radius: 16px;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.login-form-header {
+  display: grid;
+  gap: 6px;
+}
+
+.login-form-header h2 {
+  color: #f1f5f3;
+  font-size: 1.55rem;
+  margin: 0;
+}
+
 .login-form {
   display: grid;
   gap: 16px;
 }
 
 .login-form label {
-  color: #2f3d40;
+  color: #bacbc5;
   display: grid;
   font-size: 0.92rem;
   font-weight: 650;
@@ -113,15 +198,17 @@ pre {
 }
 
 .login-form input {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  min-height: 42px;
-  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(127, 179, 143, 0.16);
+  border-radius: 10px;
+  color: #f1f5f3;
+  min-height: 48px;
+  padding: 12px 14px;
 }
 
 .login-form input:focus {
-  border-color: var(--accent);
-  outline: 3px solid rgba(71, 127, 104, 0.18);
+  border-color: rgba(151, 214, 169, 0.34);
+  outline: 3px solid rgba(127, 179, 143, 0.12);
 }
 
 .login-form button,
@@ -142,9 +229,9 @@ pre {
 
 .login-form button,
 .button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: #7fb38f;
+  border-color: #7fb38f;
+  color: #08100b;
 }
 
 .button:disabled {
@@ -1107,6 +1194,7 @@ pre {
   border-top: 1px solid var(--border);
   display: grid;
   gap: 10px;
+  padding: 14px;
   padding-top: 14px;
 }
 
@@ -3614,18 +3702,24 @@ label {
   box-shadow: var(--shadow);
   display: grid;
   gap: 16px;
-  margin: auto 0;
   max-height: calc(100vh - 56px);
   overflow: auto;
   padding: 20px;
   width: min(640px, 100%);
 }
 
+.reminder-panel {
+  margin-top: 24px;
+  width: min(840px, calc(100vw - 40px));
+}
+
 .todo-edit-panel {
+  margin: auto 0;
   width: min(720px, 100%);
 }
 
 .deadline-panel {
+  margin: auto 0;
   width: min(520px, 100%);
 }
 
@@ -5698,10 +5792,16 @@ textarea:focus-visible {
 .console-shell .report-link-meta,
 .console-shell .report-timestamp-full,
 .console-shell .approval-meta,
+.console-shell .approval-list-item p,
+.console-shell .approval-list-preview,
 .console-shell .todo-meta,
 .console-shell .invoice-help,
 .console-shell .status-page-description {
   color: var(--muted);
+}
+
+.console-shell .approval-list-item h3 {
+  color: #e6efea;
 }
 
 .console-shell .button,
