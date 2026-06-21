@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +37,15 @@ type Todo = {
   priority: TodoPriority;
   due_date: string | null;
   project: TodoProject;
+  waiting_on_person_id?: number | null;
+  waiting_on_person?: { id: number; name: string } | null;
+  updated_at: string;
+};
+
+type TodoPerson = {
+  id: number;
+  name: string;
+  created_at: string;
   updated_at: string;
 };
 
@@ -69,18 +86,26 @@ function StatusSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
 
 export function TodoManager() {
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [people, setPeople] = useState<TodoPerson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
   const [project, setProject] = useState<TodoProject>("unknown");
   const [deadline, setDeadline] = useState("");
+  const [pendingTodo, setPendingTodo] = useState<Todo | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [newPersonName, setNewPersonName] = useState("");
 
   async function refresh() {
     setError("");
     try {
-      const data = await fetch("/api/todos?include_done=true").then(readJson);
-      setTodos(data.todos || []);
+      const [todoData, peopleData] = await Promise.all([
+        fetch("/api/todos?include_done=true").then(readJson),
+        fetch("/api/todo-people").then(readJson)
+      ]);
+      setTodos(todoData.todos || []);
+      setPeople(peopleData.people || []);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -130,6 +155,68 @@ export function TodoManager() {
       setTodos((current) => [updated, ...current.filter((todo) => todo.id !== updated.id)]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  }
+
+  async function createPerson(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      throw new Error("Person name is required.");
+    }
+    const data = await fetch("/api/todo-people", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: cleanName })
+    }).then(readJson);
+    const person = data.person as TodoPerson;
+    setPeople((current) => {
+      const next = [...current.filter((item) => item.id !== person.id), person];
+      return next.sort((left, right) => left.name.localeCompare(right.name));
+    });
+    return person;
+  }
+
+  async function moveTodo(todo: Todo, nextStatus: TodoStatus) {
+    if (nextStatus === "pending_on_others") {
+      setPendingTodo(todo);
+      setSelectedPersonId(todo.waiting_on_person_id ? String(todo.waiting_on_person_id) : "");
+      setNewPersonName("");
+      return;
+    }
+    await updateTodo(todo.id, {
+      status: nextStatus,
+      waiting_on_person_id: null,
+      waiting_on_person: null
+    });
+  }
+
+  async function confirmPendingOnOthers(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingTodo) {
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      let personId = selectedPersonId ? Number(selectedPersonId) : null;
+      if (!personId && newPersonName.trim()) {
+        const person = await createPerson(newPersonName);
+        personId = person.id;
+      }
+      if (!personId) {
+        throw new Error("Select an existing teammate or add a new one.");
+      }
+      await updateTodo(pendingTodo.id, {
+        status: "pending_on_others",
+        waiting_on_person_id: personId
+      });
+      setPendingTodo(null);
+      setSelectedPersonId("");
+      setNewPersonName("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -222,10 +309,13 @@ export function TodoManager() {
                         <div className="grid gap-2 text-xs text-muted-foreground">
                           <span>Project: {todo.project}</span>
                           <span>Due: {todo.due_date || "none"}</span>
+                          {todo.waiting_on_person ? (
+                            <span>Waiting: {todo.waiting_on_person.name}</span>
+                          ) : null}
                         </div>
                         <StatusSelect
                           value={todo.status}
-                          onChange={(event) => updateTodo(todo.id, { status: event.target.value as TodoStatus })}
+                          onChange={(event) => void moveTodo(todo, event.target.value as TodoStatus)}
                         />
                       </div>
                     </div>
@@ -238,6 +328,72 @@ export function TodoManager() {
           ))}
         </div>
       )}
+
+      <Dialog
+        open={pendingTodo !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingTodo(null);
+            setSelectedPersonId("");
+            setNewPersonName("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Who are you waiting on?</DialogTitle>
+            <DialogDescription>
+              Select an existing teammate or add a new one before moving this task into pending-on-others.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={confirmPendingOnOthers} className="space-y-4">
+            <div className="rounded-lg border border-border/60 bg-black/10 p-3 text-sm text-foreground/90">
+              {pendingTodo?.title}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="existing-person">Existing teammate</Label>
+              <select
+                id="existing-person"
+                value={selectedPersonId}
+                onChange={(event) => setSelectedPersonId(event.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-black/15 px-3 text-sm"
+              >
+                <option value="">Select one</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-person">Or add new teammate</Label>
+              <Input
+                id="new-person"
+                value={newPersonName}
+                onChange={(event) => setNewPersonName(event.target.value)}
+                placeholder="Name"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPendingTodo(null);
+                  setSelectedPersonId("");
+                  setNewPersonName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Move to pending"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
