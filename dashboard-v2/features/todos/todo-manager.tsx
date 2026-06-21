@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { SelectHTMLAttributes } from "react";
 import { consoleRoutes } from "@/lib/routes";
 
@@ -47,6 +49,18 @@ type TodoPerson = {
   name: string;
   created_at: string;
   updated_at: string;
+};
+
+type EditTodoForm = {
+  id: number;
+  title: string;
+  notes: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  due_date: string;
+  project: TodoProject;
+  waiting_on_person_id: string;
+  new_person_name: string;
 };
 
 const statuses: TodoStatus[] = ["inbox", "idea", "need_to_plan", "wip", "update_needed", "pending_on_others", "done"];
@@ -96,6 +110,7 @@ export function TodoManager() {
   const [pendingTodo, setPendingTodo] = useState<Todo | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
+  const [editingTodo, setEditingTodo] = useState<EditTodoForm | null>(null);
 
   async function refresh() {
     setError("");
@@ -190,6 +205,20 @@ export function TodoManager() {
     });
   }
 
+  function openEditModal(todo: Todo) {
+    setEditingTodo({
+      id: todo.id,
+      title: todo.title,
+      notes: todo.notes || "",
+      status: todo.status,
+      priority: todo.priority,
+      due_date: todo.due_date || "",
+      project: todo.project,
+      waiting_on_person_id: todo.waiting_on_person_id ? String(todo.waiting_on_person_id) : "",
+      new_person_name: ""
+    });
+  }
+
   async function confirmPendingOnOthers(event: FormEvent) {
     event.preventDefault();
     if (!pendingTodo) {
@@ -213,6 +242,49 @@ export function TodoManager() {
       setPendingTodo(null);
       setSelectedPersonId("");
       setNewPersonName("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveEditedTodo(event: FormEvent) {
+    event.preventDefault();
+    if (!editingTodo) {
+      return;
+    }
+    setIsSaving(true);
+    setError("");
+    try {
+      let waitingOnPersonId: number | null = editingTodo.waiting_on_person_id
+        ? Number(editingTodo.waiting_on_person_id)
+        : null;
+
+      if (editingTodo.status === "pending_on_others") {
+        if (!waitingOnPersonId && editingTodo.new_person_name.trim()) {
+          const person = await createPerson(editingTodo.new_person_name);
+          waitingOnPersonId = person.id;
+        }
+        if (!waitingOnPersonId) {
+          throw new Error("Select an existing teammate or add a new one before saving.");
+        }
+      } else {
+        waitingOnPersonId = null;
+      }
+
+      await updateTodo(editingTodo.id, {
+        title: editingTodo.title.trim(),
+        notes: editingTodo.notes.trim() || null,
+        status: editingTodo.status,
+        priority: editingTodo.priority,
+        due_date: editingTodo.due_date || null,
+        project: editingTodo.project,
+        waiting_on_person_id: waitingOnPersonId,
+        waiting_on_person: null
+      });
+      setEditingTodo(null);
+      await refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -301,7 +373,19 @@ export function TodoManager() {
                       <div className="space-y-2">
                         <div className="flex items-start justify-between gap-3">
                           <p className="font-medium">{todo.title}</p>
-                          <span className="text-xs text-muted-foreground">{todo.priority}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{todo.priority}</span>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-7"
+                              onClick={() => openEditModal(todo)}
+                            >
+                              <Pencil className="size-3.5" />
+                              <span className="sr-only">Edit task</span>
+                            </Button>
+                          </div>
                         </div>
                         {todo.notes ? (
                           <p className="text-sm text-muted-foreground">{todo.notes}</p>
@@ -392,6 +476,180 @@ export function TodoManager() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingTodo !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTodo(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit task</DialogTitle>
+            <DialogDescription>
+              Update task details without leaving the board.
+            </DialogDescription>
+          </DialogHeader>
+          {editingTodo ? (
+            <form onSubmit={saveEditedTodo} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editingTodo.title}
+                  onChange={(event) =>
+                    setEditingTodo({ ...editingTodo, title: event.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <select
+                    id="edit-status"
+                    value={editingTodo.status}
+                    onChange={(event) =>
+                      setEditingTodo({
+                        ...editingTodo,
+                        status: event.target.value as TodoStatus,
+                        waiting_on_person_id:
+                          event.target.value === "pending_on_others"
+                            ? editingTodo.waiting_on_person_id
+                            : "",
+                        new_person_name:
+                          event.target.value === "pending_on_others"
+                            ? editingTodo.new_person_name
+                            : ""
+                      })
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-black/15 px-3 text-sm"
+                  >
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {titleize(status)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-priority">Priority</Label>
+                  <select
+                    id="edit-priority"
+                    value={editingTodo.priority}
+                    onChange={(event) =>
+                      setEditingTodo({
+                        ...editingTodo,
+                        priority: event.target.value as TodoPriority
+                      })
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-black/15 px-3 text-sm"
+                  >
+                    {["low", "medium", "high", "urgent"].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-project">Project</Label>
+                  <select
+                    id="edit-project"
+                    value={editingTodo.project}
+                    onChange={(event) =>
+                      setEditingTodo({
+                        ...editingTodo,
+                        project: event.target.value as TodoProject
+                      })
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-black/15 px-3 text-sm"
+                  >
+                    {["unknown", "vitbhopal", "vityarthi", "recruitment", "personal"].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-due-date">Due date</Label>
+                  <Input
+                    id="edit-due-date"
+                    type="date"
+                    value={editingTodo.due_date}
+                    onChange={(event) =>
+                      setEditingTodo({ ...editingTodo, due_date: event.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              {editingTodo.status === "pending_on_others" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-existing-person">Existing teammate</Label>
+                    <select
+                      id="edit-existing-person"
+                      value={editingTodo.waiting_on_person_id}
+                      onChange={(event) =>
+                        setEditingTodo({
+                          ...editingTodo,
+                          waiting_on_person_id: event.target.value
+                        })
+                      }
+                      className="h-10 w-full rounded-md border border-input bg-black/15 px-3 text-sm"
+                    >
+                      <option value="">Select one</option>
+                      {people.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-new-person">Or add new teammate</Label>
+                    <Input
+                      id="edit-new-person"
+                      value={editingTodo.new_person_name}
+                      onChange={(event) =>
+                        setEditingTodo({
+                          ...editingTodo,
+                          new_person_name: event.target.value
+                        })
+                      }
+                      placeholder="Name"
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={editingTodo.notes}
+                  onChange={(event) =>
+                    setEditingTodo({ ...editingTodo, notes: event.target.value })
+                  }
+                  rows={5}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditingTodo(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSaving || !editingTodo.title.trim()}>
+                  {isSaving ? "Saving..." : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
