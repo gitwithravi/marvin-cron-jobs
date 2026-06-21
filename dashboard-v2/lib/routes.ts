@@ -9,6 +9,7 @@ export const consoleRoutes = {
   reports: `${consoleBasePath}/reports`,
   status: `${consoleBasePath}/status`,
   todos: `${consoleBasePath}/todos`,
+  completedTodos: `${consoleBasePath}/todos/completed`,
   emailCaptures: `${consoleBasePath}/email-captures`,
   invoices: `${consoleBasePath}/invoices`
 } as const;

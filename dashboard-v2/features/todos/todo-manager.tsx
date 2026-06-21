@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectHTMLAttributes } from "react";
+import { consoleRoutes } from "@/lib/routes";
 
 type TodoStatus =
   | "inbox"
@@ -35,8 +37,7 @@ const boardColumns: Array<{ title: string; statuses: TodoStatus[] }> = [
   { title: "Triage", statuses: ["inbox", "idea", "need_to_plan"] },
   { title: "WIP", statuses: ["wip"] },
   { title: "Update Needed", statuses: ["update_needed"] },
-  { title: "Pending on Others", statuses: ["pending_on_others"] },
-  { title: "Done", statuses: ["done"] }
+  { title: "Pending on Others", statuses: ["pending_on_others"] }
 ];
 
 async function readJson(response: Response) {
@@ -139,11 +140,24 @@ export function TodoManager() {
     }));
   }, [todos]);
 
+  const completedCount = useMemo(
+    () => todos.filter((todo) => todo.status === "done").length,
+    [todos]
+  );
+
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Create todo</CardTitle>
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Create todo</CardTitle>
+          </div>
+          <Button asChild variant="outline">
+            <Link href={consoleRoutes.completedTodos}>
+              Completed tasks
+              {completedCount > 0 ? ` (${completedCount})` : ""}
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <form onSubmit={createTodo} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px_180px_auto]">
@@ -187,7 +201,7 @@ export function TodoManager() {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading todos...</p>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-5">
+        <div className="grid gap-4 xl:grid-cols-4">
           {grouped.map((column) => (
             <Card key={column.title} className="h-full">
               <CardHeader>
