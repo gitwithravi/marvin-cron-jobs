@@ -203,7 +203,7 @@ export function InvoiceManager() {
                 <Label htmlFor="month">Month</Label>
                 <Input id="month" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-muted-foreground">USD total</p>
                   <p className="text-lg font-medium">{formatCurrency(data?.totals.amount_usd ?? 0, "USD")}</p>
@@ -217,36 +217,81 @@ export function InvoiceManager() {
             {isLoading ? (
               <p className="text-sm text-muted-foreground">Loading invoices...</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>USD</TableHead>
-                    <TableHead>INR</TableHead>
-                    <TableHead>File</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="space-y-3 md:hidden">
                   {(data?.invoices || []).map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell>{invoice.invoice_date}</TableCell>
-                      <TableCell>{invoice.invoice_from}</TableCell>
-                      <TableCell>{invoice.invoice_no || "-"}</TableCell>
-                      <TableCell>{formatCurrency(invoice.amount_usd, "USD")}</TableCell>
-                      <TableCell>{formatCurrency(invoice.amount_inr, "INR")}</TableCell>
-                      <TableCell>
+                    <div key={invoice.id} className="rounded-xl border border-border/60 bg-black/10 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="break-words font-medium">{invoice.invoice_from}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{invoice.invoice_date}</p>
+                        </div>
                         {invoice.invoice_file_url ? (
-                          <a className="text-primary underline-offset-4 hover:underline" href={invoice.invoice_file_url} target="_blank" rel="noreferrer">
+                          <a
+                            className="text-sm text-primary underline-offset-4 hover:underline"
+                            href={invoice.invoice_file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             View
                           </a>
-                        ) : "-"}
-                      </TableCell>
-                    </TableRow>
+                        ) : null}
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Invoice</p>
+                          <p className="mt-1 break-words text-foreground">{invoice.invoice_no || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">File</p>
+                          <p className="mt-1 break-words text-foreground/90">{invoice.original_filename}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">USD</p>
+                          <p className="mt-1 text-foreground">{formatCurrency(invoice.amount_usd, "USD")}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">INR</p>
+                          <p className="mt-1 text-foreground">{formatCurrency(invoice.amount_inr, "INR")}</p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>USD</TableHead>
+                        <TableHead>INR</TableHead>
+                        <TableHead>File</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.invoices || []).map((invoice) => (
+                        <TableRow key={invoice.id}>
+                          <TableCell>{invoice.invoice_date}</TableCell>
+                          <TableCell>{invoice.invoice_from}</TableCell>
+                          <TableCell>{invoice.invoice_no || "-"}</TableCell>
+                          <TableCell>{formatCurrency(invoice.amount_usd, "USD")}</TableCell>
+                          <TableCell>{formatCurrency(invoice.amount_inr, "INR")}</TableCell>
+                          <TableCell>
+                            {invoice.invoice_file_url ? (
+                              <a className="text-primary underline-offset-4 hover:underline" href={invoice.invoice_file_url} target="_blank" rel="noreferrer">
+                                View
+                              </a>
+                            ) : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -282,6 +327,10 @@ export function InvoiceManager() {
               <div className="space-y-2">
                 <Label>Extraction model</Label>
                 <Input value={draft.extraction_model || ""} readOnly />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Original file</Label>
+                <Input value={draft.original_filename} readOnly />
               </div>
               {draft.warnings.length > 0 ? (
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-4 py-3 text-sm text-amber-200 md:col-span-2">

@@ -68,19 +68,23 @@ export function ReportDetailClient({ run }: { run: ReportRun }) {
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary/90">
                 Run #{run.id}
               </p>
-              <CardTitle className="mt-2 text-2xl">{run.task_name}</CardTitle>
+              <CardTitle className="mt-2 break-words text-xl sm:text-2xl">{run.task_name}</CardTitle>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <StatusBadge value={run.risk_level || run.status} />
               {run.observed_at ? (
                 <>
                   <span>{timeAgo(run.observed_at)}</span>
-                  <span>{formatDateTime(run.observed_at)}</span>
+                  <span className="break-words">{formatDateTime(run.observed_at)}</span>
                 </>
               ) : null}
             </div>
           </div>
-          <Button onClick={handleGenerateSummary} disabled={loading || Boolean(summary)}>
+          <Button
+            onClick={handleGenerateSummary}
+            disabled={loading || Boolean(summary)}
+            className="w-full sm:w-auto"
+          >
             <Sparkles className="size-4" />
             {summary ? "Summary cached" : loading ? "Thinking..." : "Generate summary"}
           </Button>
@@ -170,7 +174,7 @@ export function ReportDetailClient({ run }: { run: ReportRun }) {
             <CardTitle>Execution error</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="overflow-x-auto rounded-lg border border-border/60 bg-black/20 p-4 text-xs">
+            <pre className="overflow-x-auto rounded-lg border border-border/60 bg-black/20 p-4 text-xs sm:text-sm">
               <code>{run.error}</code>
             </pre>
           </CardContent>

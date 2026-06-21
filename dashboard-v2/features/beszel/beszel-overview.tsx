@@ -110,11 +110,16 @@ export function BeszelOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {payload ? `Last refreshed ${timeAgo(payload.fetchedAt)}.` : "No payload yet."}
         </p>
-        <Button variant="outline" onClick={() => refresh(false)} disabled={isRefreshing}>
+        <Button
+          variant="outline"
+          onClick={() => refresh(false)}
+          disabled={isRefreshing}
+          className="w-full justify-center sm:w-auto"
+        >
           <RefreshCcw className="size-4" />
           {isRefreshing ? "Refreshing..." : "Refresh"}
         </Button>
@@ -128,7 +133,7 @@ export function BeszelOverview() {
 
       {payload ? (
         <>
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <MetricCard label="Systems" value={payload.summary.systemCount} />
             <MetricCard label="Containers" value={payload.summary.containerCount} />
             <MetricCard label="Triggered alerts" value={payload.summary.triggeredAlertCount} />
@@ -140,30 +145,66 @@ export function BeszelOverview() {
                 <CardTitle>Systems</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>System</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>CPU</TableHead>
-                      <TableHead>Memory</TableHead>
-                      <TableHead>Disk</TableHead>
-                      <TableHead>Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payload.systems.map((system) => (
-                      <TableRow key={system.id}>
-                        <TableCell>{system.name}</TableCell>
-                        <TableCell><StatusBadge value={system.status} /></TableCell>
-                        <TableCell>{formatPercent(system.latest.cpu)}</TableCell>
-                        <TableCell>{formatPercent(system.latest.memory)}</TableCell>
-                        <TableCell>{formatPercent(system.latest.disk)}</TableCell>
-                        <TableCell>{formatDateTime(system.updated)}</TableCell>
+                <div className="space-y-3 lg:hidden">
+                  {payload.systems.map((system) => (
+                    <div key={system.id} className="rounded-xl border border-border/60 bg-black/10 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium">{system.name}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Updated {formatDateTime(system.updated)}
+                          </p>
+                        </div>
+                        <StatusBadge value={system.status} className="self-start" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">CPU</p>
+                          <p className="mt-1 text-foreground">{formatPercent(system.latest.cpu)}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Memory</p>
+                          <p className="mt-1 text-foreground">{formatPercent(system.latest.memory)}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Disk</p>
+                          <p className="mt-1 text-foreground">{formatPercent(system.latest.disk)}</p>
+                        </div>
+                        <div>
+                          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Load</p>
+                          <p className="mt-1 text-foreground">{system.latest.load ?? "n/a"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden lg:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>System</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>CPU</TableHead>
+                        <TableHead>Memory</TableHead>
+                        <TableHead>Disk</TableHead>
+                        <TableHead>Updated</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {payload.systems.map((system) => (
+                        <TableRow key={system.id}>
+                          <TableCell>{system.name}</TableCell>
+                          <TableCell><StatusBadge value={system.status} /></TableCell>
+                          <TableCell>{formatPercent(system.latest.cpu)}</TableCell>
+                          <TableCell>{formatPercent(system.latest.memory)}</TableCell>
+                          <TableCell>{formatPercent(system.latest.disk)}</TableCell>
+                          <TableCell>{formatDateTime(system.updated)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -201,30 +242,62 @@ export function BeszelOverview() {
               <CardTitle>Containers</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>System</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>CPU</TableHead>
-                    <TableHead>Memory</TableHead>
-                    <TableHead>Image</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payload.containers.map((container) => (
-                    <TableRow key={`${container.id}-${container.name}`}>
-                      <TableCell>{container.name || "Unnamed container"}</TableCell>
-                      <TableCell>{container.systemName || "Unknown"}</TableCell>
-                      <TableCell><StatusBadge value={container.status} /></TableCell>
-                      <TableCell>{formatPercent(container.cpu)}</TableCell>
-                      <TableCell>{formatPercent(container.memory)}</TableCell>
-                      <TableCell className="max-w-[220px] truncate">{container.image || "-"}</TableCell>
+              <div className="space-y-3 lg:hidden">
+                {payload.containers.map((container) => (
+                  <div key={`${container.id}-${container.name}`} className="rounded-xl border border-border/60 bg-black/10 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium">{container.name || "Unnamed container"}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {container.systemName || "Unknown system"}
+                        </p>
+                      </div>
+                      <StatusBadge value={container.status} className="self-start" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                      <div>
+                        <p className="font-mono text-[11px] uppercase tracking-[0.14em]">CPU</p>
+                        <p className="mt-1 text-foreground">{formatPercent(container.cpu)}</p>
+                      </div>
+                      <div>
+                        <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Memory</p>
+                        <p className="mt-1 text-foreground">{formatPercent(container.memory)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Image</p>
+                      <p className="mt-1 break-all text-foreground/90">{container.image || "-"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>System</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>CPU</TableHead>
+                      <TableHead>Memory</TableHead>
+                      <TableHead>Image</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {payload.containers.map((container) => (
+                      <TableRow key={`${container.id}-${container.name}`}>
+                        <TableCell>{container.name || "Unnamed container"}</TableCell>
+                        <TableCell>{container.systemName || "Unknown"}</TableCell>
+                        <TableCell><StatusBadge value={container.status} /></TableCell>
+                        <TableCell>{formatPercent(container.cpu)}</TableCell>
+                        <TableCell>{formatPercent(container.memory)}</TableCell>
+                        <TableCell className="max-w-[220px] break-all">{container.image || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </>
