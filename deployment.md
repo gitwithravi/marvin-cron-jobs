@@ -38,7 +38,7 @@ pip install -r requirements.txt
 ## 4. Install dashboard dependencies
 
 ```bash
-cd dashboard
+cd dashboard-v2
 npm install
 cd ..
 ```
@@ -114,7 +114,7 @@ NTFY_ACCESS_TOKEN=
 ## 6. Create the dashboard `.env.local`
 
 ```bash
-cd dashboard
+cd dashboard-v2
 cp .env.example .env.local
 chmod 600 .env.local
 ```
@@ -182,7 +182,7 @@ python tools/index_support_rag.py --no-qdrant
 ## 9. Build the dashboard
 
 ```bash
-cd dashboard
+cd dashboard-v2
 npm run build
 cd ..
 ```
@@ -190,23 +190,23 @@ cd ..
 ## 10. Start with PM2
 
 ```bash
-pm2 start dashboard/ecosystem.config.cjs
+pm2 start dashboard-v2/ecosystem.config.cjs
 pm2 save
 pm2 startup
 ```
 
 The PM2 process file starts:
-- `marvin-dashboard` on `127.0.0.1:3030`
+- `marvin-dashboard-v2` on `127.0.0.1:3032`
 - `marvin-api` on `127.0.0.1:3031`
 
 Useful PM2 commands:
 
 ```bash
 pm2 list
-pm2 logs marvin-dashboard
+pm2 logs marvin-dashboard-v2
 pm2 logs marvin-api
-pm2 restart marvin-dashboard marvin-api
-pm2 restart marvin-dashboard --update-env
+pm2 restart marvin-dashboard-v2 marvin-api
+pm2 restart marvin-dashboard-v2 --update-env
 pm2 restart marvin-api --update-env
 ```
 
@@ -220,7 +220,7 @@ server {
     server_name marvin.example.com;
 
     location / {
-        proxy_pass http://127.0.0.1:3030;
+        proxy_pass http://127.0.0.1:3032;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
@@ -262,12 +262,12 @@ Add the operational tasks you want to run on a schedule. Example:
 
 If you want inbound email capture:
 
-1. Set `MARVIN_EMAIL_CAPTURE_SECRET` in both root `.env` and `dashboard/.env.local`.
+1. Set `MARVIN_EMAIL_CAPTURE_SECRET` in both root `.env` and `dashboard-v2/.env.local`.
 2. Set `MARVIN_ALLOWED_FORWARDERS` to the real forwarder addresses.
 3. Restart PM2:
 
 ```bash
-pm2 restart marvin-api marvin-dashboard --update-env
+pm2 restart marvin-api marvin-dashboard-v2 --update-env
 ```
 
 4. Deploy the Cloudflare Worker in `workers/cloudflare-email-worker/`.
@@ -287,7 +287,7 @@ MARVIN_EMAIL_CAPTURE_SECRET = "replace-with-a-long-random-secret"
 After startup, verify the services:
 
 ```bash
-curl -I http://127.0.0.1:3030/login
+curl -I http://127.0.0.1:3032/login
 curl -s http://127.0.0.1:${MARVIN_API_PORT}/todo-tags
 curl -s http://127.0.0.1:${MARVIN_API_PORT}/email-captures
 curl -s http://127.0.0.1:${MARVIN_API_PORT}/runs?task_name=team_status_today
@@ -296,7 +296,7 @@ curl -s http://127.0.0.1:${MARVIN_API_PORT}/runs?task_name=team_status_today
 If email capture is enabled, test the webhook directly:
 
 ```bash
-curl -sS -X POST http://127.0.0.1:3030/api/marvin/email-capture \
+curl -sS -X POST http://127.0.0.1:3032/api/marvin/email-capture \
   -H 'Content-Type: application/json' \
   -H "X-Marvin-Email-Secret: $MARVIN_EMAIL_CAPTURE_SECRET" \
   -d '{
@@ -315,8 +315,8 @@ curl -sS -X POST http://127.0.0.1:3030/api/marvin/email-capture \
 Expected result:
 - `success: true`
 - `taskId` returned
-- todo appears in `/dashboard/todos`
-- capture appears in `/dashboard/email-captures`
+- todo appears in `/console/todos`
+- capture appears in `/console/email-captures`
 
 ## 15. Backups
 
@@ -328,7 +328,7 @@ data/qdrant_support_rag/
 data/support_rag_examples.jsonl
 reports/
 .env
-dashboard/.env.local
+dashboard-v2/.env.local
 ```
 
 ## 16. Update flow
@@ -340,11 +340,11 @@ cd /opt/marvin-agent
 git pull
 . .venv/bin/activate
 pip install -r requirements.txt
-cd dashboard
+cd dashboard-v2
 npm install
 npm run build
 cd ..
-pm2 restart marvin-api marvin-dashboard --update-env
+pm2 restart marvin-api marvin-dashboard-v2 --update-env
 ```
 
 If you change support RAG data:
@@ -358,8 +358,8 @@ pm2 restart marvin-api
 If you change only dashboard UI:
 
 ```bash
-cd dashboard
+cd dashboard-v2
 npm run build
 cd ..
-pm2 restart marvin-dashboard
+pm2 restart marvin-dashboard-v2
 ```

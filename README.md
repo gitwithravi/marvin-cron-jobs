@@ -20,7 +20,7 @@ MARVIN is a script-first operations agent with a private web dashboard. Tasks ru
 
 ```text
 browser
-  -> Next.js dashboard on 127.0.0.1:3030
+  -> Next.js dashboard on 127.0.0.1:3032
   -> authenticated /api/* routes
   -> FastAPI MARVIN API on 127.0.0.1:${MARVIN_API_PORT}
   -> task scripts, SQLite data, reports, OpenRouter, Hermes, and upstream service APIs
@@ -52,7 +52,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 
-cd dashboard
+cd dashboard-v2
 npm install
 cd ..
 ```
@@ -112,7 +112,7 @@ For invoice uploads, confirmed PDFs are archived under `data/invoices/`. `INVOIC
 ### 4. Configure dashboard environment
 
 ```bash
-cd dashboard
+cd dashboard-v2
 cp .env.example .env.local
 chmod 600 .env.local
 ```
@@ -123,7 +123,7 @@ Create a password hash:
 printf 'your-password' | sha1sum
 ```
 
-Set dashboard values in `dashboard/.env.local`:
+Set dashboard values in `dashboard-v2/.env.local`:
 
 ```text
 DASHBOARD_USERNAME=admin
@@ -138,7 +138,7 @@ MARVIN_API_PORT=3031
 ### 5. Build and start with PM2
 
 ```bash
-cd /opt/marvin-agent/dashboard
+cd /opt/marvin-agent/dashboard-v2
 npm run build
 pm2 start ecosystem.config.cjs
 pm2 save
@@ -147,18 +147,18 @@ pm2 startup
 
 The PM2 config starts:
 
-- `marvin-dashboard`: Next.js on `127.0.0.1:3030`
+- `marvin-dashboard-v2`: Next.js on `127.0.0.1:3032`
 - `marvin-api`: FastAPI MARVIN API using `.venv/bin/python3`
 
-No PM2 or deployment topology change is required for the approval queue. It runs inside the existing `marvin-api` and `marvin-dashboard` processes.
+No PM2 or deployment topology change is required for the approval queue. It runs inside the existing `marvin-api` and `marvin-dashboard-v2` processes.
 
 Useful commands:
 
 ```bash
 pm2 list
-pm2 logs marvin-dashboard
+pm2 logs marvin-dashboard-v2
 pm2 logs marvin-api
-pm2 restart marvin-dashboard marvin-api
+pm2 restart marvin-dashboard-v2 marvin-api
 ```
 
 ### 6. Configure nginx
@@ -171,7 +171,7 @@ server {
     server_name marvin.example.ts.net;
 
     location / {
-        proxy_pass http://127.0.0.1:3030;
+        proxy_pass http://127.0.0.1:3032;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
@@ -205,7 +205,7 @@ Each task can run manually or from cron. Example production cron entries:
 */30 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.vityarthi_support_tickets.run >> logs/vityarthi_support_tickets.log 2>&1
 ```
 
-Keep `logs/.gitkeep`, `data/.gitkeep`, and generated reports on disk. Back up `data/marvin.sqlite3`, `reports/`, `.env`, and `dashboard/.env.local`.
+Keep `logs/.gitkeep`, `data/.gitkeep`, and generated reports on disk. Back up `data/marvin.sqlite3`, `reports/`, `.env`, and `dashboard-v2/.env.local`.
 
 ## Local Development
 
@@ -219,13 +219,13 @@ python marvin_core/marvin_api.py
 Run the dashboard:
 
 ```bash
-cd dashboard
+cd dashboard-v2
 npm run dev
 ```
 
 Default local URLs:
 
-- Dashboard: `http://127.0.0.1:3030`
+- Dashboard: `http://127.0.0.1:3032`
 - MARVIN API: `http://127.0.0.1:${MARVIN_API_PORT}`
 
 ## Tasks
@@ -323,16 +323,16 @@ Run backend tests:
 Run dashboard checks:
 
 ```bash
-cd dashboard
+cd dashboard-v2
 npm run build
 ```
 
 Basic production smoke checks:
 
 ```bash
-curl -I http://127.0.0.1:3030/login
+curl -I http://127.0.0.1:3032/login
 curl -s http://127.0.0.1:${MARVIN_API_PORT}/todo-tags
-curl -i -s -X POST http://127.0.0.1:3030/api/hermes-converse \
+curl -i -s -X POST http://127.0.0.1:3032/api/hermes-converse \
   -H 'Content-Type: application/json' \
   -d '{"message":"ping","history":[]}'
 ```
@@ -341,7 +341,7 @@ The last command should return `401 Unauthorized` unless you include a valid das
 
 ## Security Notes
 
-- Keep `.env` and `dashboard/.env.local` private; they contain password-equivalent and API credentials.
+- Keep `.env` and `dashboard-v2/.env.local` private; they contain password-equivalent and API credentials.
 - Do not expose the FastAPI MARVIN API directly. It is intended to bind to `127.0.0.1`.
 - Do not expose the dashboard outside a private network without HTTPS.
 - Use a long random `SESSION_SECRET`.

@@ -38,10 +38,10 @@ python -m marvin_core.marvin_api
 .venv/bin/python tools/telegram_notification.py --message "MARVIN test notification"
 ```
 
-**Dashboard (in `dashboard/`)**
+**Dashboard (in `dashboard-v2/`)**
 
 ```bash
-npm run dev      # Next.js dev on 127.0.0.1:3030
+npm run dev      # Next.js dev on 127.0.0.1:3032
 npm run build    # Production build
 npm start        # Production start (also managed by PM2)
 npm run lint     # ESLint
@@ -50,11 +50,11 @@ npm run lint     # ESLint
 **Production (PM2)**
 
 ```bash
-pm2 start dashboard/ecosystem.config.cjs   # Starts marvin-dashboard + marvin-api
+pm2 start dashboard-v2/ecosystem.config.cjs   # Starts marvin-dashboard-v2 + marvin-api
 pm2 list
-pm2 logs marvin-dashboard
+pm2 logs marvin-dashboard-v2
 pm2 logs marvin-api
-pm2 restart marvin-dashboard marvin-api
+pm2 restart marvin-dashboard-v2 marvin-api
 ```
 
 **Cron scheduling** — tasks are designed to be cron-friendly. Example crontab entries are in README.md.
@@ -82,18 +82,18 @@ pm2 restart marvin-dashboard marvin-api
 | `SOUL.md` | MARVIN's full personality and operating principles |
 | `communication_style.md` | Shorter style guide actually injected into LLM prompts |
 | `TASK_CREATION_GUIDELINE.md` | Definitive guide for adding new tasks |
-| `dashboard/app/` | Next.js App Router pages and API routes |
-| `dashboard/lib/` | Shared TypeScript utilities (auth, API proxy, task helpers) |
-| `dashboard/components/` | React components for dashboard UI |
+| `dashboard-v2/app/` | Next.js App Router pages and API routes |
+| `dashboard-v2/lib/` | Shared TypeScript utilities (auth, API proxy, task helpers) |
+| `dashboard-v2/components/` | React components for dashboard UI |
 | `requirements.txt` | Python dependencies |
-| `dashboard/package.json` | Node.js dependencies |
+| `dashboard-v2/package.json` | Node.js dependencies |
 
 ## Architecture
 
 ### Two-Tier Design
 
 ```
-Browser → Next.js dashboard (127.0.0.1:3030)
+Browser → Next.js dashboard (127.0.0.1:3032)
             → authenticated /api/* routes
             → FastAPI MARVIN API (127.0.0.1:3031)
                → task scripts, SQLite, OpenRouter, Hermes, upstream APIs
@@ -103,7 +103,7 @@ The browser **never** calls OpenRouter, Hermes, task APIs, or SQLite directly. T
 
 ### Dashboard API Routes
 
-All `/api/*` routes under `dashboard/app/api/` are Next.js server-side route handlers. The pattern is:
+All `/api/*` routes under `dashboard-v2/app/api/` are Next.js server-side route handlers. The pattern is:
 
 1. Check session auth (`requireApiSession()` from `lib/marvin-server.ts`)
 2. Proxy to the FastAPI MARVIN backend (`proxyToMarvinApi()` from same file)
@@ -156,7 +156,7 @@ tasks/                # One directory per operational task
 
 tests/                # pytest test files (one per module/task)
 
-dashboard/            # Next.js 15 + React 19 app
+dashboard-v2/         # Next.js 15 + React 19 app
   app/                # App Router pages and API routes
   lib/                # Server-side TS utilities
   components/         # React components
