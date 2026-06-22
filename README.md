@@ -203,6 +203,7 @@ Each task can run manually or from cron. Example production cron entries:
 */15 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.beszel_server_status.run >> logs/beszel_server_status.log 2>&1
 */30 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.team_status_today.run >> logs/team_status_today.log 2>&1
 */30 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python -m tasks.vityarthi_support_tickets.run >> logs/vityarthi_support_tickets.log 2>&1
+*/5 * * * * cd /opt/marvin-agent && . .venv/bin/activate && python tools/imap_email_poll.py >> logs/imap_email_poll.log 2>&1
 ```
 
 Keep `logs/.gitkeep`, `data/.gitkeep`, and generated reports on disk. Back up `data/marvin.sqlite3`, `reports/`, `.env`, and `dashboard-v2/.env.local`.
