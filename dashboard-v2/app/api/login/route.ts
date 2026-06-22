@@ -1,6 +1,11 @@
-import { NextResponse } from "next/server";
 import { createSession, validateCredentials } from "@/lib/server/auth";
-import { appRedirectUrl } from "@/lib/server/redirects";
+
+function redirect(path: string) {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: path }
+  });
+}
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -9,11 +14,11 @@ export async function POST(request: Request) {
 
   try {
     if (!validateCredentials(username, password)) {
-      return NextResponse.redirect(appRedirectUrl(request, "/login?error=invalid"), 303);
+      return redirect("/login?error=invalid");
     }
     await createSession(username);
-    return NextResponse.redirect(appRedirectUrl(request, "/console"), 303);
+    return redirect("/console");
   } catch {
-    return NextResponse.redirect(appRedirectUrl(request, "/login?error=config"), 303);
+    return redirect("/login?error=config");
   }
 }
