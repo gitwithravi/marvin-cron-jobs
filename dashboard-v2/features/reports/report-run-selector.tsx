@@ -69,11 +69,13 @@ function ReportLinks({
 export function ReportRunSelector({
   taskName,
   reports,
-  selectedFileName
+  selectedFileName,
+  triggerLabel = "All runs"
 }: {
   taskName: string;
   reports: ReportItem[];
   selectedFileName: string | null;
+  triggerLabel?: string;
 }) {
   return (
     <>
@@ -82,7 +84,7 @@ export function ReportRunSelector({
           <DialogTrigger asChild>
             <Button variant="outline" className="w-full justify-center sm:w-auto">
               <List className="size-4" />
-              All runs
+              {triggerLabel}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto p-4 sm:p-6">

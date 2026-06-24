@@ -32,8 +32,9 @@ export default async function ReportTaskPage({ params, searchParams }: Props) {
           detail.task.reports.length > 0 ? (
             <ReportRunSelector
               taskName={detail.task.taskName}
-              reports={detail.task.reports}
+              reports={detail.task.reports.slice(0, 1)}
               selectedFileName={detail.selectedReport?.fileName || null}
+              triggerLabel="Latest run"
             />
           ) : undefined
         }
@@ -42,7 +43,7 @@ export default async function ReportTaskPage({ params, searchParams }: Props) {
         {detail.task.reports.length > 0 ? (
           <ReportRunSelector
             taskName={detail.task.taskName}
-            reports={detail.task.reports}
+            reports={detail.task.reports.slice(0, 10)}
             selectedFileName={detail.selectedReport?.fileName || null}
           />
         ) : (
